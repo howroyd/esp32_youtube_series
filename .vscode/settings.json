@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "stdio.h": "c",
+        "esp_spi_flash.h": "c"
+    },
+    "terminal.integrated.shell.windows":"C:\\WINDOWS\\system32\\cmd.exe",
+    "terminal.integrated.cwd":"E:\\esp-idf-2",
+    "terminal.integrated.shellArgs.windows":["/k", "C:\\Users\\Simon\\.espressif\\.espressif\\idf_cmd_init.bat", "C:\\Users\\Simon\\AppData\\Local\\Programs\\Python\\Python37-32\\", "C:\\Program Files\\Git\\cmd\\"]
+}
