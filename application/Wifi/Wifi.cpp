@@ -62,6 +62,8 @@ void Wifi::_task(void *pvParameters)
 
             if ((last_connect_call == 0) || ((xTaskGetTickCount() - last_connect_call) > period))
             {
+                wifi_scan();
+                
                 ESP_LOGD(LOG_TAG, "Connecting");
                 vTaskDelay(DEFAULT_DELAY);
 
@@ -268,6 +270,111 @@ void Wifi::deregister_wifi_event_handler(const client_event_handler event_handle
             // Match found for this handle
             client_event_handlers.erase(iter);
         }
+    }
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+void Wifi::wifi_scan(void)
+{
+    uint16_t number = 20;
+    wifi_ap_record_t ap_info[number]{};
+    uint16_t ap_count = 0;
+
+    esp_wifi_scan_start(NULL, true);
+    esp_wifi_scan_get_ap_records(&number, ap_info);
+    esp_wifi_scan_get_ap_num(&ap_count);
+    ESP_LOGI(LOG_TAG, "Total APs scanned = %u", ap_count);
+
+    for (int i = 0; (i < number) && (i < ap_count); ++i) 
+    {
+        ESP_LOGI(LOG_TAG, "SSID \t\t%s", ap_info[i].ssid);
+        ESP_LOGI(LOG_TAG, "RSSI \t\t%d", ap_info[i].rssi);
+        print_auth_mode(ap_info[i].authmode);
+        if (ap_info[i].authmode != WIFI_AUTH_WEP) {
+            print_cipher_type(ap_info[i].pairwise_cipher, ap_info[i].group_cipher);
+        }
+        ESP_LOGI(LOG_TAG, "Channel \t\t%d\n", ap_info[i].primary);
+    }
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+void Wifi::print_auth_mode(int authmode)
+{
+    switch (authmode) {
+    case WIFI_AUTH_OPEN:
+        ESP_LOGI(LOG_TAG, "Authmode \tWIFI_AUTH_OPEN");
+        break;
+    case WIFI_AUTH_WEP:
+        ESP_LOGI(LOG_TAG, "Authmode \tWIFI_AUTH_WEP");
+        break;
+    case WIFI_AUTH_WPA_PSK:
+        ESP_LOGI(LOG_TAG, "Authmode \tWIFI_AUTH_WPA_PSK");
+        break;
+    case WIFI_AUTH_WPA2_PSK:
+        ESP_LOGI(LOG_TAG, "Authmode \tWIFI_AUTH_WPA2_PSK");
+        break;
+    case WIFI_AUTH_WPA_WPA2_PSK:
+        ESP_LOGI(LOG_TAG, "Authmode \tWIFI_AUTH_WPA_WPA2_PSK");
+        break;
+    case WIFI_AUTH_WPA2_ENTERPRISE:
+        ESP_LOGI(LOG_TAG, "Authmode \tWIFI_AUTH_WPA2_ENTERPRISE");
+        break;
+    default:
+        ESP_LOGI(LOG_TAG, "Authmode \tWIFI_AUTH_UNKNOWN");
+        break;
+    }
+
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+void Wifi::print_cipher_type(int pairwise_cipher, int group_cipher)
+{
+    switch (pairwise_cipher) {
+    case WIFI_CIPHER_TYPE_NONE:
+        ESP_LOGI(LOG_TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_NONE");
+        break;
+    case WIFI_CIPHER_TYPE_WEP40:
+        ESP_LOGI(LOG_TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_WEP40");
+        break;
+    case WIFI_CIPHER_TYPE_WEP104:
+        ESP_LOGI(LOG_TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_WEP104");
+        break;
+    case WIFI_CIPHER_TYPE_TKIP:
+        ESP_LOGI(LOG_TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_TKIP");
+        break;
+    case WIFI_CIPHER_TYPE_CCMP:
+        ESP_LOGI(LOG_TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_CCMP");
+        break;
+    case WIFI_CIPHER_TYPE_TKIP_CCMP:
+        ESP_LOGI(LOG_TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_TKIP_CCMP");
+        break;
+    default:
+        ESP_LOGI(LOG_TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_UNKNOWN");
+        break;
+    }
+
+    switch (group_cipher) {
+    case WIFI_CIPHER_TYPE_NONE:
+        ESP_LOGI(LOG_TAG, "Group Cipher \tWIFI_CIPHER_TYPE_NONE");
+        break;
+    case WIFI_CIPHER_TYPE_WEP40:
+        ESP_LOGI(LOG_TAG, "Group Cipher \tWIFI_CIPHER_TYPE_WEP40");
+        break;
+    case WIFI_CIPHER_TYPE_WEP104:
+        ESP_LOGI(LOG_TAG, "Group Cipher \tWIFI_CIPHER_TYPE_WEP104");
+        break;
+    case WIFI_CIPHER_TYPE_TKIP:
+        ESP_LOGI(LOG_TAG, "Group Cipher \tWIFI_CIPHER_TYPE_TKIP");
+        break;
+    case WIFI_CIPHER_TYPE_CCMP:
+        ESP_LOGI(LOG_TAG, "Group Cipher \tWIFI_CIPHER_TYPE_CCMP");
+        break;
+    case WIFI_CIPHER_TYPE_TKIP_CCMP:
+        ESP_LOGI(LOG_TAG, "Group Cipher \tWIFI_CIPHER_TYPE_TKIP_CCMP");
+        break;
+    default:
+        ESP_LOGI(LOG_TAG, "Group Cipher \tWIFI_CIPHER_TYPE_UNKNOWN");
+        break;
     }
 }
 

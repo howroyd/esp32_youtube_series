@@ -96,6 +96,10 @@ private:
     static void _task(void *pvParameters);
     static TaskHandle_t _taskhandle;
 
+    static void wifi_scan(void);
+    static void print_auth_mode(int authmode);
+    static void print_cipher_type(int pairwise_cipher, int group_cipher);
+
     static void _wifi_event_handler(void *arg, esp_event_base_t event_base,
                                     int32_t event_id, void *event_data);
 
