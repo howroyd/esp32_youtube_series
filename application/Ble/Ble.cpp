@@ -79,10 +79,11 @@ esp_ble_adv_params_t Ble::adv_params =
 // --------------------------------------------------------------------------------------------------------------------
 void Ble::task()
 {
+	/*
 	while (start == false)
 	{
 		vTaskDelay(pdMS_TO_TICKS(1000));
-	}
+	}*/
 
 	ESP_LOGI(LOG_TAG, "Task running");
 
@@ -90,11 +91,6 @@ void Ble::task()
 	while (init() != ESP_OK)
 	{
 		vTaskDelay(pdMS_TO_TICKS(1000));
-	}
-
-	while (true)
-	{
-		vTaskDelay(1000);
 	}
 
 	// Set our serial number to the last three bytes of the 
@@ -273,8 +269,6 @@ esp_err_t Ble::init(void)
 	// Initialise the dual mode Bluetooth (BLE & Classic) controller
 	status |= init_common(mode);
 	ESP_LOGD(LOG_TAG, "Common Init: %s", esp_err_to_name(status));
-
-	while (true) vTaskDelay(1000);
 
 	// Register the GAP callback
 	status |= esp_ble_gap_register_callback(gap_event_handler);

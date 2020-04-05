@@ -31,7 +31,7 @@
 class Main final // To ultimately become the co-ordinator if deemed necessary
 {
 public:
-    Main(void) : relay(GPIO_NUM_15), ble{Bt_Le::Ble::get_instance(ESP_BT_MODE_BLE)}, sntp{SNTP::Sntp::get_instance()} {}
+    Main(void) : relay(GPIO_NUM_15), ble{Bt_Le::Ble::get_instance(ESP_BT_MODE_BLE)}, sntp{SNTP::Sntp::get_instance()}, mqtt() {}
 
     bool setup(void);
     void run(void);
