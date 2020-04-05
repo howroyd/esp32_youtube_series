@@ -16,7 +16,7 @@ public:
     }
 
     // Interface
-    static esp_err_t init_common(esp_bt_mode_t mode=ESP_BT_MODE_IDLE);
+    static esp_err_t init_common(esp_bt_mode_t mode = ESP_BT_MODE_IDLE);
     static esp_err_t deinit_common(void);
 
     // Helper functions

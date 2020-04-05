@@ -35,6 +35,11 @@ Gatt::Gatt_hub_info_svc Ble::hub_info =
 	"0"
 };
 
+Gatt::Gatt_time_svc Ble::time_info =
+{
+	IDX_TIME, // Service ID
+};
+
 // --------------------------------------------------------------------------------------------------------------------
 // BLE Advertising
 // --------------------------------------------------------------------------------------------------------------------
@@ -74,12 +79,22 @@ esp_ble_adv_params_t Ble::adv_params =
 // --------------------------------------------------------------------------------------------------------------------
 void Ble::task()
 {
+	while (start == false)
+	{
+		vTaskDelay(pdMS_TO_TICKS(1000));
+	}
+
 	ESP_LOGI(LOG_TAG, "Task running");
 
 	// Start up BLE services
 	while (init() != ESP_OK)
 	{
 		vTaskDelay(pdMS_TO_TICKS(1000));
+	}
+
+	while (true)
+	{
+		vTaskDelay(1000);
 	}
 
 	// Set our serial number to the last three bytes of the 
@@ -96,9 +111,12 @@ void Ble::task()
 	// Start advertising
 	advertise();
 
+	running = true;
+
 	// Main task loop
 	while (true)
 	{
+		//time_info.update();
 		vTaskDelay(1000);
 	}
 }
@@ -254,15 +272,21 @@ esp_err_t Ble::init(void)
 
 	// Initialise the dual mode Bluetooth (BLE & Classic) controller
 	status |= init_common(mode);
+	ESP_LOGD(LOG_TAG, "Common Init: %s", esp_err_to_name(status));
+
+	while (true) vTaskDelay(1000);
 
 	// Register the GAP callback
 	status |= esp_ble_gap_register_callback(gap_event_handler);
+	ESP_LOGD(LOG_TAG, "Gap callback register: %s", esp_err_to_name(status));
 
 	// Register the GATTS callback
 	status |= esp_ble_gatts_register_callback(gatts_event_handler);
+	ESP_LOGD(LOG_TAG, "Gatts callback register: %s", esp_err_to_name(status));
 
 	// Register the app identifier
 	status |= esp_ble_gatts_app_register(ESP_APP_ID); // TODO what does this do??
+	ESP_LOGD(LOG_TAG, "Gap app register: %s", esp_err_to_name(status));
 
 	if (status == ESP_OK)
 	{
@@ -280,9 +304,13 @@ esp_err_t Ble::init(void)
 
 	uint16_t timeout = 10;
 
-	while ((!dev_info.service_started() && !spp.service_started() && !hub_info.service_started()) && timeout > 0)
+	while ((!dev_info.service_started() 
+				&& !spp.service_started() 
+				&& !hub_info.service_started()/*
+				&& !time_info.service_started()*/) 
+			&& timeout > 0)
 	{
-		vTaskDelay(50);
+		vTaskDelay(pdMS_TO_TICKS(500));
 		--timeout;
 	}
 
@@ -405,6 +433,10 @@ void Ble::gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t 
 		{
 			ESP_LOGE(LOG_TAG, "Failed to create Hub Information table");
 		}
+		if (time_info.create_table(gatts_if) != ESP_OK)
+		{
+			ESP_LOGE(LOG_TAG, "Failed to create Time table");
+		}
         break;
     }
     case ESP_GATTS_READ_EVT:
@@ -497,7 +529,14 @@ void Ble::gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t 
 				{
 					ESP_LOGE(LOG_TAG, "Failed to start Hub Information service");
 				}
-			}
+			}/*
+			else if (param->add_attr_tab.svc_inst_id == time_info.id && param->add_attr_tab.num_handle == time_info.n_entries)
+			{
+				if (time_info.start_service(param->add_attr_tab.handles) != ESP_OK)
+				{
+					ESP_LOGE(LOG_TAG, "Failed to start Time service");
+				}
+			}*/
     	}
 
         break;
@@ -521,7 +560,11 @@ void Ble::gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t 
 			else if (param->create.service_handle == spp[0])
 			{
 				;
-			}
+			}/*
+			else if (param->create.service_handle == time_info[0])
+			{
+				;
+			}*/
 		}
 		break;
 	default:
@@ -585,7 +628,12 @@ struct Ble::gatts_profile_inst Ble::profile_tab[IDX_N_IDX_ENTRIES] =
 	{
 		.gatts_cb = gatts_profile_event_handler,
 		.gatts_if = ESP_GATT_IF_NONE // Not get the gatt_if, so initial is ESP_GATT_IF_NONE
-	}
+	},/*
+	[IDX_TIME] =
+	{
+		.gatts_cb = gatts_profile_event_handler,
+		.gatts_if = ESP_GATT_IF_NONE // Not get the gatt_if, so initial is ESP_GATT_IF_NONE
+	}*/
 };
 
 } // namespace Bt_Le

@@ -1,5 +1,9 @@
 #include "Bt_Common.h"
 
+#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+#include "esp_log.h"
+#define LOG_TAG "BT Common"
+
 namespace Bt
 {
 
@@ -14,7 +18,7 @@ esp_err_t BtCommon::init_common(esp_bt_mode_t mode)
 	// Effectively a semaphore. Ensures two cores/tasks aren't calling this method simultaneously
     while (init_called == init_e::WAIT)
     {
-    	vTaskDelay(10);
+        vTaskDelay(500);
     }
 
     // Check if we are already init'd
@@ -23,65 +27,49 @@ esp_err_t BtCommon::init_common(esp_bt_mode_t mode)
     	return init_success ? ESP_OK : ESP_FAIL;
     }
 
+    esp_err_t ret = ESP_OK;
+
     // Set our state so nobody else tries to run this method on another core/task
     init_called = init_e::WAIT;
 
     // Set our Bluetooth controller mode
-    BtCommon::mode = mode;
-
-    // Initialize NVS as it is used to store PHY calibration data
-    esp_err_t ret = nvs_flash_init();
-
-    // Check the NVS is valid
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
-        ret = nvs_flash_init();
-    }
-
-/*
-	// Release memory if not using dual mode Bluetooth
-	// Note; this is a one way trip until reboot.  Cannot be undone.
-    switch (mode)
-    {
-    case ESP_BT_MODE_BLE:
-        printf("Releasing memory for the unused BT Classic controller\r\n");
-        ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
-        break;
-    case ESP_BT_MODE_CLASSIC_BT:
-        printf("Releasing memory for the unused BLE controller\r\n");
-        ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_BLE));
-        break;
-    default:
-        break;
-    }
-*/
-
-    // Get our init parameters for our Bluetooth controller from our menuconfig settings
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+    BtCommon::mode = static_cast<esp_bt_mode_t>(bt_cfg.mode);
+    
+    ESP_LOGI(LOG_TAG, "Mode %d:%d", bt_cfg.mode, BtCommon::mode);
 
     // Initialise the Bluetooth controller
     if ((ret = esp_bt_controller_init(&bt_cfg)) != ESP_OK)
     {
+        ESP_LOGE(LOG_TAG, "Controller init: %s", esp_err_to_name(ret));
         return ret;
     }
-
+    ESP_LOGD(LOG_TAG, "Controller init: %s", esp_err_to_name(ret));
+    
     // Enable the Bluetooth controller
-    if ((ret = esp_bt_controller_enable(ESP_BT_MODE_BTDM)) != ESP_OK)
+    ESP_LOGD(LOG_TAG, "Controller enable...");
+    if ((ret = esp_bt_controller_enable(BtCommon::mode)) != ESP_OK)
     {
+        ESP_LOGE(LOG_TAG, "Controller enable: %s %d", esp_err_to_name(ret), BtCommon::mode);
         return ret;
     }
+    ESP_LOGD(LOG_TAG, "Controller enable: %s", esp_err_to_name(ret));
 
-    // Init our Bluetooth stack
+     // Init our Bluetooth stack
     if ((ret = esp_bluedroid_init()) != ESP_OK)
     {
+        ESP_LOGE(LOG_TAG, "Bluedroid init: %s", esp_err_to_name(ret));
         return ret;
     }
+    ESP_LOGD(LOG_TAG, "Bluedroid init: %s", esp_err_to_name(ret));
 
     // Enable our Bluetooth stack
     if ((ret = esp_bluedroid_enable()) != ESP_OK)
     {
+        ESP_LOGE(LOG_TAG, "Bluedroid enable: %s", esp_err_to_name(ret));
         return ret;
     }
+    ESP_LOGD(LOG_TAG, "Bluedroid enable: %s", esp_err_to_name(ret));
 
     // If we get here, success!
     init_success = true; // We're init'd

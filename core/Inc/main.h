@@ -5,7 +5,10 @@
 
 #include "driver/gpio.h"
 
-#define MEMORY_DEBUGGING
+#include "esp_event.h"
+#include "nvs_flash.h"
+
+//#define MEMORY_DEBUGGING
 
 #if defined(MEMORY_DEBUGGING)
 #include "multi_heap.h"
@@ -16,31 +19,34 @@
 
 #define MEMORY_LOG_INTERVAL_MS 10000
 #define MEMORY_HEAP_MIN (50 * 1024) // minimum bytes before WARN_LOW triggers
-#define MEMORY_STACK_MIN (256 * 2) // minimum bytes before WARN_LOW triggers
+#define MEMORY_STACK_MIN (256 * 2)  // minimum bytes before WARN_LOW triggers
 #endif
 
-#include "Ble.h"
+//#include "Ble.h"
+#include "MqttClient.h"
+#include "SntpTime.h"
+#include "Gpio.h"
 
-class Main // To ultimately become the co-ordinator if deemed necessary
+// --------------------------------------------------------------------------------------------------------------------
+class Main final // To ultimately become the co-ordinator if deemed necessary
 {
 public:
-    Main(void) :
-		 ble(Bt_Le::Ble::get_instance(ESP_BT_MODE_IDLE))
-    {
-        ;
-    }
+    Main(void) : relay(GPIO_NUM_15), sntp{SNTP::Sntp::get_instance()} {}
 
     bool setup(void);
     void run(void);
 
     bool start_all_tasks(void);
 
-    Bt_Le::Ble& ble;
-
-protected:
-    static constexpr gpio_num_t signal_pin = GPIO_NUM_4;
+    Gpio::gpio relay;
+    //static Bt_Le::Ble &ble;
+    SNTP::Sntp &sntp;
+    MQTT::MqttOpenhab mqtt;
 
 #if defined(MEMORY_DEBUGGING)
     void log_mem(void);
 #endif
 }; // class Main
+
+// --------------------------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------

@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.5)
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(EXTRA_COMPONENT_DIRS application core)
+set(EXTRA_COMPONENT_DIRS $ENV{IDF_PATH}/examples/common_components/protocol_examples_common application core)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 

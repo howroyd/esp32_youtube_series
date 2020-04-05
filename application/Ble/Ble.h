@@ -13,6 +13,7 @@
 namespace Bt_Le
 {
 
+// --------------------------------------------------------------------------------------------------------------------
 class Ble final: public TaskClass, Bt::BtCommon
 {
 	// ID of public full advertising UUID
@@ -27,7 +28,7 @@ class Ble final: public TaskClass, Bt::BtCommon
 	};
 
 	Ble(esp_bt_mode_t mode = ESP_BT_MODE_BLE) :
-	    	TaskClass("Ble_task", TaskPrio_Mid, 5120),
+	    	TaskClass("Ble_task", TaskPrio_Mid, 1024 * 6),
 			state{state_machine_t::OFF}
 	{
 		this->mode = mode;
@@ -39,6 +40,9 @@ class Ble final: public TaskClass, Bt::BtCommon
 	}
 
 public:
+	bool start = false;
+	bool running = false;
+
 	static Ble& get_instance(esp_bt_mode_t mode = ESP_BT_MODE_BLE)
 	{
 		static Ble instance(mode);
@@ -59,6 +63,7 @@ public:
 		IDX_DEV_INFO,
 		IDX_SPP,
 		IDX_HUB_INFO,
+		IDX_TIME,
 
 		IDX_N_IDX_ENTRIES
 	};
@@ -96,6 +101,7 @@ protected:
 	static Gatt::Gatt_dev_info_svc dev_info;
 	static Gatt::Gatt_spp_svc spp;
 	static Gatt::Gatt_hub_info_svc hub_info;
+	static Gatt::Gatt_time_svc time_info;
 
 private:
 	// Task Class and Mediator specific
@@ -149,7 +155,10 @@ private:
 	// SPP specific
     static bool enable_data_ntf;
 };
+// --------------------------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 
 } // namespace Bt_Le
+// --------------------------------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------------------------------

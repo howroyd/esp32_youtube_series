@@ -1,5 +1,5 @@
 # Name,   Type, SubType,  Offset,   Size,  Flags
 factory,  app,  factory,  0x010000, 2M
 phy_init, data, phy,      0x370000, 0x2000
-nvs,      data, nvs,      0x390000, 0x4000
-nvs_key,  data, nvs_keys, 0x3D0000, 0x2000
+nvs,      data, nvs,      0x390000, 0x5000
+nvs_key,  data, nvs_keys, 0x3E0000, 0x2000

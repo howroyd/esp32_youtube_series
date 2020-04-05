@@ -8,6 +8,7 @@
 #include "Gatt/Gatt_Device_Information.h"
 #include "Gatt/Gatt_Hub_Information.h"
 #include "Gatt/Gatt_SPP.h"
+#include "Gatt/Gatt_Time.h"
 
 #include "TaskCpp.h"
 

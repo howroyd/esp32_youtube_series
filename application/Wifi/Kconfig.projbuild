@@ -1,0 +1,14 @@
+menu "Wifi Configuration"
+
+    config WIFI_SSID
+        string "Wifi SSID"
+        default "GreenGiant-2G4"
+        help
+            SSID of the WiFi network to connect to
+
+    config WIFI_PASS
+        string "Wifi Password"
+        help
+            Password of the WiFi network
+
+endmenu

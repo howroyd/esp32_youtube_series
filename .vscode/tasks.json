@@ -5,7 +5,6 @@
     "tasks": [
         {
             "label": "build app",
-            //"group": "build",
             "command": "idf.py",
             "type": "shell",
             "args": [
@@ -26,18 +25,22 @@
                     "severity": 4,
                     "message": 5
                 }
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
             }
         },
         {
             "label": "clean app",
             "command": "idf.py",
-            "type":"shell",
+            "type": "shell",
             "args": [
                 "clean"
             ],
             "presentation": {
-                "reveal": "always",
-            },
+                "reveal": "always"
+            }
         },
         {
             "label": "flash app",
@@ -49,8 +52,8 @@
                 "flash"
             ],
             "presentation": {
-                "reveal": "always",
-            },
+                "reveal": "always"
+            }
         },
         {
             "label": "monitor",
@@ -60,10 +63,10 @@
                 "args": [
                     "idf.py",
                     "monitor"
-                ],
+                ]
             },
             "presentation": {
-                "reveal": "always",
+                "reveal": "always"
             },
             "problemMatcher": []
         },
@@ -78,7 +81,7 @@
                 ]
             },
             "presentation": {
-                "reveal": "always",
+                "reveal": "always"
             },
             "problemMatcher": []
         }
