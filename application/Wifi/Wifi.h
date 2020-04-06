@@ -1,3 +1,24 @@
+ /*
+    Copyright Simon Howroyd, 5 Apr 2020 - All Rights Reserved
+    May be used free of charge. Selling without prior written consent prohibited. 
+    Obtain permission before redistributing. In all cases this notice must remain intact.
+    https://github.com/howroyd
+ */
+ 
+ /*
+   This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
 #include <vector>
 
 #include "freertos/FreeRTOS.h"
