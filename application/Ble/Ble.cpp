@@ -300,8 +300,8 @@ esp_err_t Ble::init(void)
 
 	while ((!dev_info.service_started() 
 				&& !spp.service_started() 
-				&& !hub_info.service_started()/*
-				&& !time_info.service_started()*/) 
+				&& !hub_info.service_started()
+				&& !time_info.service_started()) 
 			&& timeout > 0)
 	{
 		vTaskDelay(pdMS_TO_TICKS(500));
@@ -508,13 +508,20 @@ void Ble::gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t 
 				{
 					ESP_LOGE(LOG_TAG, "Failed to start device information service");
 				}
-				
+				else
+				{
+					ESP_LOGI(LOG_TAG, "Device information service started");
+				}
     		}
     		else if (param->add_attr_tab.svc_inst_id == spp.id && param->add_attr_tab.num_handle == spp.n_entries)
     		{
     			if (spp.start_service(param->add_attr_tab.handles) != ESP_OK)
 				{
 					ESP_LOGE(LOG_TAG, "Failed to start SPP service");
+				}
+				else
+				{
+					ESP_LOGI(LOG_TAG, "SPP started");
 				}
     		}
     		else if (param->add_attr_tab.svc_inst_id == hub_info.id && param->add_attr_tab.num_handle == hub_info.n_entries)
@@ -523,14 +530,22 @@ void Ble::gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t 
 				{
 					ESP_LOGE(LOG_TAG, "Failed to start Hub Information service");
 				}
-			}/*
+				else
+				{
+					ESP_LOGI(LOG_TAG, "Hub Information service started");
+				}
+			}
 			else if (param->add_attr_tab.svc_inst_id == time_info.id && param->add_attr_tab.num_handle == time_info.n_entries)
 			{
 				if (time_info.start_service(param->add_attr_tab.handles) != ESP_OK)
 				{
 					ESP_LOGE(LOG_TAG, "Failed to start Time service");
 				}
-			}*/
+				else
+				{
+					ESP_LOGI(LOG_TAG, "Time service started");
+				}
+			}
     	}
 
         break;
@@ -554,11 +569,11 @@ void Ble::gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t 
 			else if (param->create.service_handle == spp[0])
 			{
 				;
-			}/*
+			}
 			else if (param->create.service_handle == time_info[0])
 			{
 				;
-			}*/
+			}
 		}
 		break;
 	default:
@@ -584,8 +599,6 @@ void Ble::gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if
     // If event is register event, store the gatts_if for each profile
 	for (size_t idx = 0; idx < IDX_N_IDX_ENTRIES; ++idx)
 	{
-
-
 		if (gatts_if == ESP_GATT_IF_NONE || // ESP_GATT_IF_NONE, not specify a certain gatt_if, need to call every profile cb function
 			gatts_if == profile_tab[idx].gatts_if)
 		{
@@ -622,12 +635,12 @@ struct Ble::gatts_profile_inst Ble::profile_tab[IDX_N_IDX_ENTRIES] =
 	{
 		.gatts_cb = gatts_profile_event_handler,
 		.gatts_if = ESP_GATT_IF_NONE // Not get the gatt_if, so initial is ESP_GATT_IF_NONE
-	},/*
+	},
 	[IDX_TIME] =
 	{
 		.gatts_cb = gatts_profile_event_handler,
 		.gatts_if = ESP_GATT_IF_NONE // Not get the gatt_if, so initial is ESP_GATT_IF_NONE
-	}*/
+	}
 };
 
 } // namespace Bt_Le
