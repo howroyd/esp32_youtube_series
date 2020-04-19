@@ -61,9 +61,9 @@ public:
 	enum : uint16_t
 	{
 		IDX_DEV_INFO,
-		IDX_SPP,
 		IDX_HUB_INFO,
 		IDX_TIME,
+		IDX_SPP,
 
 		IDX_N_IDX_ENTRIES
 	};
@@ -107,6 +107,9 @@ private:
 	// Task Class and Mediator specific
 	void task(void);
 	//void handle_msg(hub::MediatorMessage* msg);
+
+	static volatile bool registered;
+	static volatile esp_gatt_if_t gatts_if;
 
 	// Notifications and states
     enum class state_machine_t : uint32_t

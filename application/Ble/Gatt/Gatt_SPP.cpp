@@ -38,13 +38,14 @@ const esp_gatt_perm_t Gatt_spp_svc::permissions[GATT_SPP_N_ENTRIES + GATT_SPP_N_
 
 const uint16_t Gatt_spp_svc::max_length[GATT_SPP_N_ENTRIES + GATT_SPP_N_NOTIFIES] =
 {
-	SPP_DATA_MAX_LEN,
-	SPP_DATA_MAX_LEN
+	DATA_MAX_LEN,
+	DATA_MAX_LEN
 };
+
 const uint16_t Gatt_spp_svc::length[GATT_SPP_N_ENTRIES + GATT_SPP_N_NOTIFIES] =
 {
-	SPP_DATA_MAX_LEN,
-	SPP_DATA_MAX_LEN
+	DATA_MAX_LEN,
+	DATA_MAX_LEN
 };
 
 } // namespace Gatt

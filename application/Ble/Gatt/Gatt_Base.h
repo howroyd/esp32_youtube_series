@@ -10,6 +10,8 @@
 #include "esp_gatt_defs.h"
 #include "esp_bt_defs.h"
 
+#define DATA_MAX_LEN 20
+
 namespace Gatt
 {
 
