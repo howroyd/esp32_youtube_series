@@ -8,6 +8,8 @@ namespace Bt_Le
 {
 
 esp_bt_mode_t Ble::mode = ESP_BT_MODE_BLE; // Our startup state
+volatile bool Ble::registered{false};
+volatile esp_gatt_if_t Ble::gatts_if{ESP_GATT_IF_NONE};
 
 // --------------------------------------------------------------------------------------------------------------------
 // GATT Services
@@ -23,9 +25,6 @@ Gatt::Gatt_dev_info_svc Ble::dev_info =
 	BLE_GATTS_FW
 };
 
-// Alcuris SPP Service
-Gatt::Gatt_spp_svc Ble::spp(IDX_SPP);
-
 Gatt::Gatt_hub_info_svc Ble::hub_info =
 {
 	IDX_HUB_INFO, // Service ID
@@ -39,6 +38,9 @@ Gatt::Gatt_time_svc Ble::time_info =
 {
 	IDX_TIME, // Service ID
 };
+
+// Alcuris SPP Service
+Gatt::Gatt_spp_svc Ble::spp(IDX_SPP);
 
 // --------------------------------------------------------------------------------------------------------------------
 // BLE Advertising
@@ -79,10 +81,11 @@ esp_ble_adv_params_t Ble::adv_params =
 // --------------------------------------------------------------------------------------------------------------------
 void Ble::task()
 {
+	/*
 	while (start == false)
 	{
 		vTaskDelay(pdMS_TO_TICKS(1000));
-	}
+	}*/
 
 	ESP_LOGI(LOG_TAG, "Task running");
 
@@ -90,11 +93,6 @@ void Ble::task()
 	while (init() != ESP_OK)
 	{
 		vTaskDelay(pdMS_TO_TICKS(1000));
-	}
-
-	while (true)
-	{
-		vTaskDelay(1000);
 	}
 
 	// Set our serial number to the last three bytes of the 
@@ -116,7 +114,8 @@ void Ble::task()
 	// Main task loop
 	while (true)
 	{
-		//time_info.update();
+		ESP_LOGD(LOG_TAG, "Updating BLE time");
+		time_info.update();
 		vTaskDelay(1000);
 	}
 }
@@ -274,8 +273,6 @@ esp_err_t Ble::init(void)
 	status |= init_common(mode);
 	ESP_LOGD(LOG_TAG, "Common Init: %s", esp_err_to_name(status));
 
-	while (true) vTaskDelay(1000);
-
 	// Register the GAP callback
 	status |= esp_ble_gap_register_callback(gap_event_handler);
 	ESP_LOGD(LOG_TAG, "Gap callback register: %s", esp_err_to_name(status));
@@ -302,16 +299,79 @@ esp_err_t Ble::init(void)
 		ESP_LOGE(LOG_TAG, "Failed to start: %s", esp_err_to_name(status));
 	}
 
-	uint16_t timeout = 10;
+	while (!registered) vTaskDelay(1000);
 
-	while ((!dev_info.service_started() 
-				&& !spp.service_started() 
-				&& !hub_info.service_started()/*
-				&& !time_info.service_started()*/) 
-			&& timeout > 0)
+	// Create our service list
+	if (!dev_info.service_started())
 	{
-		vTaskDelay(pdMS_TO_TICKS(500));
-		--timeout;
+		if (dev_info.create_table(gatts_if) != ESP_OK)
+		{
+			ESP_LOGE(LOG_TAG, "Failed to create Device Information table");
+			status &= ESP_FAIL;
+		}
+		else
+		{
+			ESP_LOGD(LOG_TAG, "Device Information Service table created, if:%u", gatts_if);
+		}
+		while (!dev_info.service_started() && status == ESP_OK)
+		{
+			ESP_LOGD(LOG_TAG, "Waiting on Device Information service");
+			vTaskDelay(pdMS_TO_TICKS(2000));
+		}
+	}
+
+	if (!hub_info.service_started())
+	{
+		if (hub_info.create_table(gatts_if) != ESP_OK)
+		{
+			ESP_LOGE(LOG_TAG, "Failed to create Hub Information table");
+			status &= ESP_FAIL;
+		}
+		else
+		{
+			ESP_LOGD(LOG_TAG, "Hub Information Service table created, if:%u", gatts_if);
+		}
+		while (!hub_info.service_started() && status == ESP_OK)
+		{
+			ESP_LOGD(LOG_TAG, "Waiting on Hub Information service");
+			vTaskDelay(pdMS_TO_TICKS(2000));
+		}
+	}
+
+	if (!time_info.service_started())
+	{
+		if (time_info.create_table(gatts_if) != ESP_OK)
+		{
+			ESP_LOGE(LOG_TAG, "Failed to create Time table");
+			status &= ESP_FAIL;
+		}
+		else
+		{
+			ESP_LOGD(LOG_TAG, "Time Service table created, if:%u", gatts_if);
+		}
+		while (!time_info.service_started() && status == ESP_OK)
+		{
+			ESP_LOGD(LOG_TAG, "Waiting on Time Service");
+			vTaskDelay(pdMS_TO_TICKS(2000));
+		}
+	}
+
+	if (!spp.service_started())
+	{
+		if (spp.create_table(gatts_if) != ESP_OK)
+		{
+			ESP_LOGE(LOG_TAG, "Failed to create SPP table");
+			status &= ESP_FAIL;
+		}
+		else
+		{
+			ESP_LOGD(LOG_TAG, "SPP Service table created, if:%u", gatts_if);
+		}
+		while (!spp.service_started() && status == ESP_OK)
+		{
+			ESP_LOGD(LOG_TAG, "Waiting on SPP service");
+			vTaskDelay(pdMS_TO_TICKS(2000));
+		}
 	}
 
 	return status;
@@ -416,10 +476,15 @@ void Ble::gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t
 // --------------------------------------------------------------------------------------------------------------------
 void Ble::gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
 {
+	//ESP_LOGD(LOG_TAG, "GattS event:%u, if:%u", event, gatts_if);
+
     switch (event)
     {
     case ESP_GATTS_REG_EVT:
     {
+		registered = true;
+		Ble::gatts_if = gatts_if;
+#if 0
         // Create our service list
 		if (dev_info.create_table(gatts_if) != ESP_OK)
 		{
@@ -437,6 +502,7 @@ void Ble::gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t 
 		{
 			ESP_LOGE(LOG_TAG, "Failed to create Time table");
 		}
+#endif
         break;
     }
     case ESP_GATTS_READ_EVT:
@@ -514,13 +580,20 @@ void Ble::gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t 
 				{
 					ESP_LOGE(LOG_TAG, "Failed to start device information service");
 				}
-				
+				else
+				{
+					ESP_LOGI(LOG_TAG, "Device information service started");
+				}
     		}
     		else if (param->add_attr_tab.svc_inst_id == spp.id && param->add_attr_tab.num_handle == spp.n_entries)
     		{
     			if (spp.start_service(param->add_attr_tab.handles) != ESP_OK)
 				{
 					ESP_LOGE(LOG_TAG, "Failed to start SPP service");
+				}
+				else
+				{
+					ESP_LOGI(LOG_TAG, "SPP started");
 				}
     		}
     		else if (param->add_attr_tab.svc_inst_id == hub_info.id && param->add_attr_tab.num_handle == hub_info.n_entries)
@@ -529,15 +602,31 @@ void Ble::gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t 
 				{
 					ESP_LOGE(LOG_TAG, "Failed to start Hub Information service");
 				}
-			}/*
+				else
+				{
+					ESP_LOGI(LOG_TAG, "Hub Information service started");
+				}
+			}
 			else if (param->add_attr_tab.svc_inst_id == time_info.id && param->add_attr_tab.num_handle == time_info.n_entries)
 			{
 				if (time_info.start_service(param->add_attr_tab.handles) != ESP_OK)
 				{
 					ESP_LOGE(LOG_TAG, "Failed to start Time service");
 				}
-			}*/
-    	}
+				else
+				{
+					ESP_LOGI(LOG_TAG, "Time service started");
+				}
+			}
+			else
+			{
+				ESP_LOGW(LOG_TAG, "Unknown service started, ID:%u Num:%u", param->add_attr_tab.svc_inst_id, param->add_attr_tab.num_handle);
+			}
+		}
+		else
+		{
+			ESP_LOGE(LOG_TAG, "Service start failed, ID:%u Num:%u, Status:%s", param->add_attr_tab.svc_inst_id, param->add_attr_tab.num_handle, esp_err_to_name(param->add_attr_tab.status));
+		}
 
         break;
     }
@@ -560,11 +649,11 @@ void Ble::gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t 
 			else if (param->create.service_handle == spp[0])
 			{
 				;
-			}/*
+			}
 			else if (param->create.service_handle == time_info[0])
 			{
 				;
-			}*/
+			}
 		}
 		break;
 	default:
@@ -590,8 +679,6 @@ void Ble::gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if
     // If event is register event, store the gatts_if for each profile
 	for (size_t idx = 0; idx < IDX_N_IDX_ENTRIES; ++idx)
 	{
-
-
 		if (gatts_if == ESP_GATT_IF_NONE || // ESP_GATT_IF_NONE, not specify a certain gatt_if, need to call every profile cb function
 			gatts_if == profile_tab[idx].gatts_if)
 		{
@@ -619,21 +706,21 @@ struct Ble::gatts_profile_inst Ble::profile_tab[IDX_N_IDX_ENTRIES] =
 		.gatts_cb = gatts_profile_event_handler,
 		.gatts_if = ESP_GATT_IF_NONE // Not get the gatt_if, so initial is ESP_GATT_IF_NONE
 	},
+	[IDX_HUB_INFO] =
+	{
+		.gatts_cb = gatts_profile_event_handler,
+		.gatts_if = ESP_GATT_IF_NONE // Not get the gatt_if, so initial is ESP_GATT_IF_NONE
+	},	
+	[IDX_TIME] =
+	{
+		.gatts_cb = gatts_profile_event_handler,
+		.gatts_if = ESP_GATT_IF_NONE // Not get the gatt_if, so initial is ESP_GATT_IF_NONE
+	},
 	[IDX_SPP] =
 	{
 		.gatts_cb = gatts_profile_event_handler,
 		.gatts_if = ESP_GATT_IF_NONE // Not get the gatt_if, so initial is ESP_GATT_IF_NONE
 	},
-	[IDX_HUB_INFO] =
-	{
-		.gatts_cb = gatts_profile_event_handler,
-		.gatts_if = ESP_GATT_IF_NONE // Not get the gatt_if, so initial is ESP_GATT_IF_NONE
-	},/*
-	[IDX_TIME] =
-	{
-		.gatts_cb = gatts_profile_event_handler,
-		.gatts_if = ESP_GATT_IF_NONE // Not get the gatt_if, so initial is ESP_GATT_IF_NONE
-	}*/
 };
 
 } // namespace Bt_Le

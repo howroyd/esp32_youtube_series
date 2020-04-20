@@ -10,7 +10,7 @@ namespace Gatt
 // --------------------------------------------------------------------------------------------------------------------
 #define GATT_SPP_N_ENTRIES 1
 #define GATT_SPP_N_NOTIFIES 1
-#define SPP_DATA_MAX_LEN 20
+
 class Gatt_spp_svc final : public Gatt_table_base<GATT_SPP_N_ENTRIES, GATT_SPP_N_NOTIFIES>
 {
 	// Alcuris SPP primary UUID
@@ -124,8 +124,9 @@ private:
 	static const uint16_t max_length[GATT_SPP_N_ENTRIES + GATT_SPP_N_NOTIFIES];
 	static const uint16_t length[GATT_SPP_N_ENTRIES + GATT_SPP_N_NOTIFIES];
 
-	const char data_write[SPP_DATA_MAX_LEN];
-	const char data_notify[SPP_DATA_MAX_LEN];
+	const char data_write[DATA_MAX_LEN];
+	const char data_notify[DATA_MAX_LEN];
+	
 	const uint8_t* value[GATT_SPP_N_ENTRIES + GATT_SPP_N_NOTIFIES];
 	const uint8_t notify_ccc[2] = {0x00, 0x00};
 };

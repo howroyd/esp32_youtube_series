@@ -22,7 +22,7 @@
 #define MEMORY_STACK_MIN (256 * 2)  // minimum bytes before WARN_LOW triggers
 #endif
 
-//#include "Ble.h"
+#include "Ble.h"
 #include "MqttClient.h"
 #include "SntpTime.h"
 #include "Gpio.h"
@@ -31,7 +31,7 @@
 class Main final // To ultimately become the co-ordinator if deemed necessary
 {
 public:
-    Main(void) : relay(GPIO_NUM_15), sntp{SNTP::Sntp::get_instance()} {}
+    Main(void) : relay(GPIO_NUM_15), ble{Bt_Le::Ble::get_instance(ESP_BT_MODE_BLE)}, sntp{SNTP::Sntp::get_instance()}, mqtt() {}
 
     bool setup(void);
     void run(void);
@@ -39,7 +39,7 @@ public:
     bool start_all_tasks(void);
 
     Gpio::gpio relay;
-    //static Bt_Le::Ble &ble;
+    Bt_Le::Ble &ble;
     SNTP::Sntp &sntp;
     MQTT::MqttOpenhab mqtt;
 

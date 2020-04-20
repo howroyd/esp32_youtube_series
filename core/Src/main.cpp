@@ -71,7 +71,7 @@ bool Main::start_all_tasks(void)
 {
 	bool ret_status{true};
 
-	//ble.start = true;
+	ble.start = true;
 	//while (ble.running == false)
 	//	vTaskDelay(pdMS_TO_TICKS(1000));
 
