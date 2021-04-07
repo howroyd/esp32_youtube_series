@@ -5,8 +5,45 @@ namespace WIFI
 
 char Wifi::mac_addr_cstr[]{};
 
-std::mutex Wifi::first_call_mutx;
-bool Wifi::first_call{false};
+SemaphoreHandle_t Wifi::first_call_mutx{nullptr};
+StaticSemaphore_t Wifi::first_call_mutx_buffer{};
+bool Wifi::first_call{true};
+
+Wifi::Wifi(void)
+{
+    if (!first_call_mutx) 
+    {
+        first_call_mutx = xSemaphoreCreateRecursiveMutexStatic(&first_call_mutx_buffer);
+        configASSERT(first_call_mutx);
+
+        configASSERT(pdPASS == xSemaphoreGive(first_call_mutx));
+    }
+
+    bool it_worked = false;
+
+    for (int i = 0 ; i < 3 ; ++i)
+        if (pdPASS == xSemaphoreTake(first_call_mutx, pdSECOND))
+        {
+            if (first_call)
+            {
+                if (ESP_OK != _get_mac()) esp_restart();
+                first_call = false;
+            }
+
+            xSemaphoreGive(first_call_mutx);
+
+            it_worked = true;
+
+            break;
+        }
+        else
+        {
+            continue;
+        }
+    }
+
+    if (!it_worked) esp_restart();
+}
 
 esp_err_t Wifi::_get_mac(void)
 {
