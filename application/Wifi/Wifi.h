@@ -1,14 +1,22 @@
 #pragma once
 
 #include "esp_wifi.h"
+#include "esp_event.h"
+#include "esp_log.h"
 
+#include <algorithm>
 #include <mutex>
+
+#include <cstring>
 
 namespace WIFI
 {
 
 class Wifi
 {
+    constexpr static const char* ssid{"MyWifiSsid"};
+    constexpr static const char* password{"MyWifiPassword"};
+
 public:
     // Strongly typed enum to define our state
     enum class state_e
@@ -26,7 +34,6 @@ public:
 
     // "Rule of 5" Constructors and assignment operators
     // Ref: https://en.cppreference.com/w/cpp/language/rule_of_three
-    // YOUTUBE Talk about this, ref above and CPP Weekly
     Wifi(void);
     ~Wifi(void)                     = default;
     Wifi(const Wifi&)               = default;
@@ -37,17 +44,20 @@ public:
     esp_err_t init(void);       // TODO Set everything up
     esp_err_t begin(void);      // TODO Start WiFi, connect, etc
 
-    state_e get_state(void);    // TODO
+    state_e get_state(void);    // TODO constexpr static const state_e&
 
-    // YOUTUBE talk about this being constexpr
     constexpr static const char* get_mac(void) 
         { return mac_addr_cstr; }
 
 private:
-    void state_machine(void);   // TODO
+    static esp_err_t _init(void);
+    static wifi_init_config_t wifi_init_config;
+    static wifi_config_t wifi_config;
+
+    void state_machine(void);   // TODO static
+    static state_e _state;             // TODO static
 
     // Get the MAC from the API and convert to ASCII HEX
-    // YOUTUBE Why is this static
     static esp_err_t _get_mac(void);
 
     static char mac_addr_cstr[13];  ///< Buffer to hold MAC as cstring

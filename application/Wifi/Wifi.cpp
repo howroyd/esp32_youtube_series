@@ -4,8 +4,12 @@ namespace WIFI
 {
 
 // Wifi statics
-char Wifi::mac_addr_cstr[]{};   ///< Buffer to hold MAC as cstring
-std::mutex Wifi::init_mutx{};   ///< Initialisation mutex
+char                Wifi::mac_addr_cstr[]{};    ///< Buffer to hold MAC as cstring
+std::mutex          Wifi::init_mutx{};          ///< Initialisation mutex
+Wifi::state_e       Wifi::_state{state_e::NOT_INITIALISED};
+wifi_init_config_t  Wifi::wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
+wifi_config_t       Wifi::wifi_config{};
+
 
 // Wifi Constructor
 Wifi::Wifi(void)
@@ -17,7 +21,6 @@ Wifi::Wifi(void)
 
     // Check if the MAC cstring currently begins with a
     //   nullptr, i.e. is default initialised, not set
-    // YOUTUBE Talk about removing the "first_call" flag
     if (!get_mac()[0])
     {
         // Get the MAC and if this fails restart
@@ -25,6 +28,62 @@ Wifi::Wifi(void)
             esp_restart();
     }
 }
+
+esp_err_t Wifi::_init(void)
+{
+    std::lock_guard<std::mutex> guard(init_mutx);
+
+    esp_err_t status{ESP_OK};
+
+    if (state_e::NOT_INITIALISED == _state)
+    {
+        status = esp_netif_init();
+
+        if (ESP_OK == status)
+        {
+            const esp_netif_t* const p_netif = esp_netif_create_default_wifi_sta();
+
+            if (!p_netif) status = ESP_FAIL;
+        }
+
+        if (ESP_OK == status)
+        {
+            status = esp_wifi_init(&wifi_init_config);
+        }
+
+        if (ESP_OK == status)
+        {
+            status = esp_wifi_set_mode(WIFI_MODE_STA); // TODO keep track of mode
+        }
+        
+        if (ESP_OK == status)
+        {
+            const size_t ssid_len_to_copy       = std::min(strlen(ssid), 
+                                                    sizeof(wifi_config.sta.ssid));
+
+            memcpy(wifi_config.sta.ssid, ssid, ssid_len_to_copy);
+            
+            const size_t password_len_to_copy   = std::min(strlen(password),
+                                                    sizeof(wifi_config.sta.password));
+       
+            memcpy(wifi_config.sta.password, password, password_len_to_copy);
+
+            wifi_config.sta.threshold.authmode  = WIFI_AUTH_WPA2_PSK;
+            wifi_config.sta.pmf_cfg.capable     = true;
+            wifi_config.sta.pmf_cfg.required    = false;
+
+            status = esp_wifi_set_config(WIFI_IF_STA, &wifi_config); // TODO keep track of mode
+        }
+
+    }
+    else if (state_e::ERROR == _state)
+    {
+        status = ESP_FAIL;
+    }
+
+    return status;
+}
+
 
 // Get the MAC from the API and convert to ASCII HEX
 esp_err_t Wifi::_get_mac(void)
