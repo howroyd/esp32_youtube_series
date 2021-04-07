@@ -4,9 +4,6 @@
             "name": "ESP32-Win",
             "includePath": [
                 "${workspaceRoot}",
-                "${workspaceRoot}/components",
-                "${workspaceRoot}/build",
-                "${workspaceRoot}/build/include",
                 "${env:IDF_PATH}/components/bt/bluedroid/utils/include",
                 "${env:IDF_PATH}/components/bt/bluedroid/stack/smp/include",
                 "${env:IDF_PATH}/components/bt/bluedroid/stack/sdp/include",
@@ -124,16 +121,13 @@
                 "${env:IDF_PATH}/components/wpa_supplicant/include/wpa2/eap_peer",
                 "${env:IDF_PATH}/components/wpa_supplicant/include/wpa2/tls",
                 "${env:IDF_PATH}/components/wpa_supplicant/include/wpa2/utils",
-                "${env:IDF_PATH}/components/xtensa-debug-module/include",
-                "C:/Program Files/Espressif/ESP-IDF Tools/toolchain/lib/gcc/xtensa-esp32-elf/5.2.0/include"
+                "${env:IDF_PATH}/components/xtensa-debug-module/include"//,
+                //"C:/Program Files/Espressif/ESP-IDF Tools/toolchain/lib/gcc/xtensa-esp32-elf/5.2.0/include"
             ],
             "intelliSenseMode": "clang-x64",
             "browse": {
                 "path": [
                     "${workspaceRoot}",
-                    "${workspaceRoot}/components",
-                    "${workspaceRoot}/build",
-                    "${workspaceRoot}/build/include",
                     "${env:IDF_PATH}/components/bt/bluedroid/utils/include",
                     "${env:IDF_PATH}/components/bt/bluedroid/stack/smp/include",
                     "${env:IDF_PATH}/components/bt/bluedroid/stack/sdp/include",
@@ -251,8 +245,8 @@
                     "${env:IDF_PATH}/components/wpa_supplicant/include/wpa2/eap_peer",
                     "${env:IDF_PATH}/components/wpa_supplicant/include/wpa2/tls",
                     "${env:IDF_PATH}/components/wpa_supplicant/include/wpa2/utils",
-                    "${env:IDF_PATH}/components/xtensa-debug-module/include",
-                    "C:/Program Files/Espressif/ESP-IDF Tools/toolchain/lib/gcc/xtensa-esp32-elf/5.2.0/include"
+                    "${env:IDF_PATH}/components/xtensa-debug-module/include"//,
+                    //"C:/Program Files/Espressif/ESP-IDF Tools/toolchain/lib/gcc/xtensa-esp32-elf/5.2.0/include"
                 ],
                 "limitSymbolsToIncludedHeaders": true,
                 "databaseFilename": "${workspaceRoot}/.vscode/browse.vc.db"

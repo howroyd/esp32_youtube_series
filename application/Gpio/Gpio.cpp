@@ -1,47 +1,38 @@
 #include "Gpio.h"
 
-#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
-#include "esp_log.h"
-#define LOG_TAG "GPIO"
-
 namespace Gpio
 {
 
-esp_err_t gpio::init(const bool state)
+[[nodiscard]] esp_err_t GpioBase::init(void)
 {
-    esp_err_t status = ESP_OK;
+    esp_err_t status{ESP_OK};
 
-    gpio_config_t io_conf;
-	//disable interrupt
-	io_conf.intr_type = GPIO_INTR_DISABLE;
-	//set as output mode
-	io_conf.mode = GPIO_MODE_OUTPUT;
-	//bit mask of the pins that you want to set,e.g.GPIO18/19
-	io_conf.pin_bit_mask = 1 << pin;
-	//disable pull-down mode
-	io_conf.pull_down_en = GPIO_PULLDOWN_ENABLE;
-	//disable pull-up mode
-	io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-	//configure GPIO with the given settings
-	status &= gpio_config(&io_conf);
+    status |= gpio_config(&_cfg);
 
-    if (status == ESP_OK)
+    return status;
+}
+
+[[nodiscard]] esp_err_t GpioOutput::init(void)
+{
+    esp_err_t status{GpioBase::init()};
+
+    if (ESP_OK == status)
     {
-        status &= set(state);
+        status |= set(_inverted_logic);
     }
 
     return status;
 }
 
-esp_err_t gpio::set(const bool state)
+esp_err_t GpioOutput::set(const bool state)
 {
-    this->state = state;
-    return gpio_set_level(pin, state);
+    _state = state;
+
+    return gpio_set_level(_pin,
+                            _inverted_logic ? 
+                                !state : 
+                                state);
 }
 
-bool gpio::get(void) const
-{
-    return state;
-}
 
-}
+} // namespace Gpio
