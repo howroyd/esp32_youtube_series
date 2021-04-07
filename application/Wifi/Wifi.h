@@ -2,9 +2,7 @@
 
 #include "esp_wifi.h"
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
-#define pdSECOND pdMS_TO_TICKS(1000)
+#include <mutex>
 
 namespace WIFI
 {
@@ -12,6 +10,7 @@ namespace WIFI
 class Wifi
 {
 public:
+    // Strongly typed enum to define our state
     enum class state_e
     {
         NOT_INITIALISED,
@@ -25,28 +24,34 @@ public:
         ERROR
     };
 
+    // "Rule of 5" Constructors and assignment operators
+    // Ref: https://en.cppreference.com/w/cpp/language/rule_of_three
+    // YOUTUBE Talk about this, ref above and CPP Weekly
     Wifi(void);
+    ~Wifi(void)                     = default;
+    Wifi(const Wifi&)               = default;
+    Wifi(Wifi&&)                    = default;
+    Wifi& operator=(const Wifi&)    = default;
+    Wifi& operator=(Wifi&&)         = default;
 
-    esp_err_t init(void);  // Set everything up
-    esp_err_t begin(void); // Start WiFi, connect, etc
+    esp_err_t init(void);       // TODO Set everything up
+    esp_err_t begin(void);      // TODO Start WiFi, connect, etc
 
-    state_e get_state(void);
+    state_e get_state(void);    // TODO
 
-    const char* get_mac(void) 
+    // YOUTUBE talk about this being constexpr
+    constexpr static const char* get_mac(void) 
         { return mac_addr_cstr; }
 
-protected:
-    static SemaphoreHandle_t first_call_mutx;
-
 private:
-    void state_machine(void);
+    void state_machine(void);   // TODO
 
-    esp_err_t _get_mac(void);
-    static char mac_addr_cstr[13];
+    // Get the MAC from the API and convert to ASCII HEX
+    // YOUTUBE Why is this static
+    static esp_err_t _get_mac(void);
 
-    
-    static StaticSemaphore_t first_call_mutx_buffer;
-    static bool first_call;
+    static char mac_addr_cstr[13];  ///< Buffer to hold MAC as cstring
+    static std::mutex init_mutx;    ///< Initialisation mutex
 };
 
 
