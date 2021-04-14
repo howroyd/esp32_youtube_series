@@ -23,7 +23,6 @@ public:
     {
         NOT_INITIALISED,
         INITIALISED,
-        WAITING_FOR_CREDENTIALS,
         READY_TO_CONNECT,
         CONNECTING,
         WAITING_FOR_IP,
@@ -41,10 +40,10 @@ public:
     Wifi& operator=(const Wifi&)    = default;
     Wifi& operator=(Wifi&&)         = default;
 
-    esp_err_t init(void);       // TODO Set everything up
-    esp_err_t begin(void);      // TODO Start WiFi, connect, etc
+    esp_err_t init(void);
+    esp_err_t begin(void);
 
-    state_e get_state(void);    // TODO constexpr static const state_e&
+    constexpr const state_e& get_state(void) { return _state; }
 
     constexpr static const char* get_mac(void) 
         { return mac_addr_cstr; }
@@ -55,13 +54,23 @@ private:
     static wifi_config_t wifi_config;
 
     void state_machine(void);   // TODO static
-    static state_e _state;             // TODO static
+
+    static void event_handler(void* arg, esp_event_base_t event_base,
+                                int32_t event_id, void* event_data);
+    static void wifi_event_handler(void* arg, esp_event_base_t event_base,
+                                    int32_t event_id, void* event_data);
+    static void ip_event_handler(void* arg, esp_event_base_t event_base,
+                                    int32_t event_id, void* event_data);
+
+    static state_e _state;
 
     // Get the MAC from the API and convert to ASCII HEX
     static esp_err_t _get_mac(void);
 
     static char mac_addr_cstr[13];  ///< Buffer to hold MAC as cstring
     static std::mutex init_mutx;    ///< Initialisation mutex
+    static std::mutex connect_mutx; ///< Connect mutex
+    static std::mutex state_mutx;   ///< State change mutex
 };
 
 
