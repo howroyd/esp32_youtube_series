@@ -29,6 +29,9 @@ esp_err_t Main::setup(void)
     ESP_LOGI(LOG_TAG, "Setup!");
 
     status |= led.init();
+    status |= wifi.init();
+
+    if (ESP_OK == status) status |= wifi.begin();
 
     return status;
 }

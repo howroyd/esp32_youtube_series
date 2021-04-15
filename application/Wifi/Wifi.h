@@ -14,8 +14,10 @@ namespace WIFI
 
 class Wifi
 {
-    constexpr static const char* ssid{"MyWifiSsid"};
-    constexpr static const char* password{"MyWifiPassword"};
+    constexpr static const char* _log_tag{"WiFi"};
+
+    constexpr static const char* ssid{"GreenGiant-TEST"};
+    constexpr static const char* password{"GreenGiant"};
 
 public:
     // Strongly typed enum to define our state
