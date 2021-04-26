@@ -1,4 +1,4 @@
-set(SOURCES Wifi.cpp)
+set(SOURCES Wifi.cpp SntpTime.cpp)
 
 idf_component_register(SRCS ${SOURCES}
                         INCLUDE_DIRS .

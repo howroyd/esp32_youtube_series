@@ -33,6 +33,8 @@ esp_err_t Main::setup(void)
 
     if (ESP_OK == status) status |= wifi.begin();
 
+    status |= sntp.init();
+
     return status;
 }
 

@@ -45,7 +45,7 @@ public:
     esp_err_t init(void);
     esp_err_t begin(void);
 
-    constexpr const state_e& get_state(void) { return _state; }
+    constexpr static const state_e& get_state(void) { return _state; }
 
     constexpr static const char* get_mac(void) 
         { return mac_addr_cstr; }
