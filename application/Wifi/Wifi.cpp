@@ -7,11 +7,11 @@ namespace WIFI
 char                Wifi::mac_addr_cstr[]{};    ///< Buffer to hold MAC as cstring
 std::mutex          Wifi::init_mutx{};          ///< Initialisation mutex
 std::mutex          Wifi::connect_mutx{};       ///< Connect mutex
-std::mutex          Wifi::state_mutx{};   ///< State change mutex
+std::mutex          Wifi::state_mutx{};         ///< State change mutex
 Wifi::state_e       Wifi::_state{state_e::NOT_INITIALISED};
 wifi_init_config_t  Wifi::wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
 wifi_config_t       Wifi::wifi_config{};
-
+NVS::Nvs            Wifi::nvs{};
 
 // Wifi Constructor
 Wifi::Wifi(void)

@@ -9,6 +9,8 @@
 
 #include <cstring>
 
+#include "../Nvs32/Nvs32.h"
+
 namespace WIFI
 {
 
@@ -73,6 +75,8 @@ private:
     static std::mutex init_mutx;    ///< Initialisation mutex
     static std::mutex connect_mutx; ///< Connect mutex
     static std::mutex state_mutx;   ///< State change mutex
+
+    static NVS::Nvs nvs;
 };
 
 

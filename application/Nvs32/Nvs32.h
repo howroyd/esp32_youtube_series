@@ -5,7 +5,16 @@
 #include "esp_err.h"
 #include "nvs_flash.h"
 #include "nvs.h"
-
+	/// @brief Create a GATT service in the API
+	///
+	/// @param[in] gatt_if : The GATTS Interface ID that this service will reside in
+	/// @param[in] primary_uuid : UUID of the primary service of this table
+	/// @param[in] attributes... : Attributes created with attr_characteristic
+	/// @return 
+	/// 	- ESP_OK if service table created in API
+	/// 	- ESP_ERR_INVALID_STATE if service aleady created
+	/// 	- ESP_ERR_NO_MEM if heap allocations failed
+	/// 	- other error codes from underlying GATTS API
 namespace NVS
 {
 
@@ -16,18 +25,39 @@ class Nvs
     const char* const   partition_name{nullptr};
 
 public:
+	/// @brief Construct a non-volatile storage interface
+	///
+	/// @param[in] partition_name : cstring of partition name as defined in the partition table
     constexpr Nvs(const char* const partition_name = "nvs") :
         _log_tag{partition_name},
         partition_name{partition_name} {}
 
+	/// @brief Open the partition
+	///
+	/// @return 
+	/// 	- ESP_OK if partition opened
+	/// 	- other error codes from underlying NVS API
     [[nodiscard]] esp_err_t init(void)
         { return _open(partition_name, handle); }
 
-    // With respect to a type
+	/// @brief Get an item from the NVS
+	///
+	/// @param[in] key : cstring key referring to an item in NVS
+	/// @param[out] output : variable to write the item to
+	/// @return 
+	/// 	- ESP_OK if the item was read from NVS
+	/// 	- other error codes from underlying NVS API
     template <typename T>
     [[nodiscard]] esp_err_t get(const char* const key, T& output)
         { return _get_buf(handle, key, output, 1); }
 
+	/// @brief Set an item in the NVS
+	///
+	/// @param[in] key : cstring key of new or existing item in NVS
+	/// @param[in] input : variable to write
+	/// @return 
+	/// 	- ESP_OK if the item was written and verified
+	/// 	- other error codes from underlying NVS API
     template <typename T>
     [[nodiscard]] esp_err_t set(const char* const key, const T input)
         { return _set_buf(handle, key, input, 1); }
@@ -54,7 +84,7 @@ private:
     [[nodiscard]] static esp_err_t _open(const char* const partition_name, nvs_handle_t& handle)
         { return nvs_open(partition_name, NVS_READWRITE, &handle); }
 
-    template <typename t>
+    template <typename T>
     [[nodiscard]] static esp_err_t _get(nvs_handle_t handle, const char* const key, T& output)
     {
         size_t n_bytes{sizeof(T)};
@@ -65,7 +95,7 @@ private:
             return _get_buffer(handle, key, &output, n_bytes);
     }
 
-    template <typename t>
+    template <typename T>
     [[nodiscard]] static esp_err_t _set(nvs_handle_t handle, const char* const key, T& input)
     {
         size_t n_bytes{sizeof(T)};
@@ -142,8 +172,8 @@ private:
     }
 
     template <typename T>
-    [[nodiscard]] esp_err_t _verify_buf(nvs_handle_t handle, const char* const key, 
-                                        const T* input, const size_t len)
+    [[nodiscard]] static esp_err_t _verify_buf(nvs_handle_t handle, const char* const key, 
+                                                const T* input, const size_t len)
     {
         esp_err_t status{ESP_OK};
 
