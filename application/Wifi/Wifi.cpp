@@ -180,6 +180,55 @@ esp_err_t Wifi::_init(void)
 
     if (state_e::NOT_INITIALISED == _state)
     {
+        constexpr static const char*    nvs_tag{"NVS"};
+
+        constexpr static const char*    key{"ctr"};
+        size_t  ctr{0};
+
+        ESP_LOGI(nvs_tag, "Init");
+        esp_err_t _status{nvs.init()};
+        ESP_LOGI(nvs_tag, "%s", esp_err_to_name(_status));
+
+        ESP_LOGI(nvs_tag, "Getting key \"%s\"", key);
+        _status = nvs.get(key, ctr);
+        ESP_LOGI(nvs_tag, "%s", esp_err_to_name(_status));
+
+        if (ESP_OK == _status)
+        {
+            ESP_LOGI(nvs_tag, "Counter: %u", ctr);
+
+            ++ctr;
+            ESP_LOGI(nvs_tag, "Setting key \"%s\" to %u", key, ctr);
+            _status = nvs.set(key, ctr);
+            ESP_LOGI(nvs_tag, "%s", esp_err_to_name(_status));
+        }
+        else if (ESP_ERR_NVS_NOT_FOUND == _status)
+        {
+            ESP_LOGI(nvs_tag, "Setting key \"%s\" to %u", key, ctr);
+            _status = nvs.set(key, ctr);
+            ESP_LOGI(nvs_tag, "%s", esp_err_to_name(_status));
+        }
+
+        vTaskDelay(1000);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         ESP_LOGI(_log_tag, "%s:%d Calling esp_netif_init", __func__, __LINE__);
         status = esp_netif_init();
         ESP_LOGI(_log_tag, "%s:%d esp_netif_init:%s", __func__, __LINE__,

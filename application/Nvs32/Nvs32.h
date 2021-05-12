@@ -42,29 +42,30 @@ public:
 
 	/// @brief Get an item from the NVS
 	///
-	/// @param[in] key : cstring key referring to an item in NVS
+	/// @param[in] key     : cstring key referring to an item in NVS
 	/// @param[out] output : variable to write the item to
 	/// @return 
 	/// 	- ESP_OK if the item was read from NVS
 	/// 	- other error codes from underlying NVS API
     template <typename T>
     [[nodiscard]] esp_err_t get(const char* const key, T& output)
-        { return _get_buf(handle, key, output, 1); }
+        { 
+            size_t len = 1; return _get_buf(handle, key, &output, len); }
 
 	/// @brief Set an item in the NVS
 	///
-	/// @param[in] key : cstring key of new or existing item in NVS
+	/// @param[in] key   : cstring key of new or existing item in NVS
 	/// @param[in] input : variable to write
 	/// @return 
 	/// 	- ESP_OK if the item was written and verified
 	/// 	- other error codes from underlying NVS API
     template <typename T>
-    [[nodiscard]] esp_err_t set(const char* const key, const T input)
-        { return _set_buf(handle, key, input, 1); }
+    [[nodiscard]] esp_err_t set(const char* const key, const T& input)
+        { return _set_buf(handle, key, &input, 1); }
 
     template <typename T>
-    [[nodiscard]] esp_err_t verify(const char* const key, const T input)
-        { return _verify_buf(handle, key, input, 1); }
+    [[nodiscard]] esp_err_t verify(const char* const key, const T& input)
+        { return _verify_buf(handle, key, &input, 1); }
 
 
     // With respect to a buffer
@@ -152,14 +153,13 @@ private:
     [[nodiscard]] static esp_err_t _set_buf(nvs_handle_t handle, const char* const key, 
                                             const T* input, const size_t len)
     {
-        size_t n_bytes{sizeof(T) * len};
         esp_err_t status{ESP_OK};
 
         if (nullptr == key || 0 == strlen(key) || nullptr == input || 0 == len)
             status = ESP_ERR_INVALID_ARG;
         else
         {
-            status = nvs_set_blob(handle, key, input, &n_bytes);
+            status = nvs_set_blob(handle, key, input, sizeof(T) * len);
 
             if (ESP_OK == status)
                 status = nvs_commit(handle);
