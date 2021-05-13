@@ -46,7 +46,8 @@
 			"xstddef": "cpp",
 			"xstring": "cpp",
 			"xtr1common": "cpp",
-			"*.ipp": "cpp"
+			"*.ipp": "cpp",
+			"*.inc": "cpp"
 		},
 		"terminal.integrated.shell.windows": "C:\\WINDOWS\\system32\\cmd.exe",
 		"window.zoomLevel": 2,

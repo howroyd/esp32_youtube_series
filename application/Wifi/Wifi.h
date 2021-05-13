@@ -3,6 +3,8 @@
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_smartconfig.h"
+#include "smartconfig_ack.h"
 
 #include <algorithm>
 #include <mutex>
@@ -53,9 +55,25 @@ public:
         { return mac_addr_cstr; }
 
 private:
-    static esp_err_t _init(void);
-    static wifi_init_config_t wifi_init_config;
-    static wifi_config_t wifi_config;
+    enum class smartconfig_state_e
+    {
+        NOT_STARTED,
+        STARTED
+    };
+    static smartconfig_state_e  smartconfig_state;
+
+    static esp_err_t                    _init(void);
+    static wifi_init_config_t           wifi_init_config;
+    static wifi_config_t                wifi_config;
+    static smartconfig_start_config_t   smartconfig_config;
+
+    static bool empty_credentials(void)
+    {
+        if ('\0' == wifi_config.sta.ssid[0] ||
+            '\0' == wifi_config.sta.password[0])
+            return true;
+        return false;
+    }
 
     void state_machine(void);   // TODO static
 
@@ -65,6 +83,8 @@ private:
                                     int32_t event_id, void* event_data);
     static void ip_event_handler(void* arg, esp_event_base_t event_base,
                                     int32_t event_id, void* event_data);
+    static void sc_event_handler(void* arg, esp_event_base_t event_base,
+                                    int32_t event_id, void* event_data); ///< smart config
 
     static state_e _state;
 
