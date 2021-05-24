@@ -140,7 +140,7 @@ void Wifi::sc_event_handler(void* arg, esp_event_base_t event_base,
         {
         case SC_EVENT_GOT_SSID_PSWD:
         {
-            const smartconfig_event_got_ssid_pswd_t* const
+            smartconfig_event_got_ssid_pswd_t* const
                 data{static_cast<smartconfig_event_got_ssid_pswd_t*>(event_data)};
 
             if (_state == state_e::READY_TO_CONNECT)
@@ -148,7 +148,7 @@ void Wifi::sc_event_handler(void* arg, esp_event_base_t event_base,
                 const esp_err_t sc_ack_status = sc_send_ack_start(data->type, data->token, data->cellphone_ip);
                 if (sc_ack_status != ESP_OK) 
                 {
-                    ESP_LOGE(LOG_TAG, "Send smartconfig ACK error: %s", esp_err_to_name(sc_ack_status));
+                    ESP_LOGE(_log_tag, "Send smartconfig ACK error: %s", esp_err_to_name(sc_ack_status));
                 }
 
                 memcpy(wifi_config.sta.ssid, data->ssid,
@@ -156,7 +156,7 @@ void Wifi::sc_event_handler(void* arg, esp_event_base_t event_base,
                                     sizeof(smartconfig_event_got_ssid_pswd_t::ssid)));
 
                 memcpy(wifi_config.sta.password, data->password,
-                        std::min(sizeof(wwifi_sta_config_t::password), 
+                        std::min(sizeof(wifi_sta_config_t::password), 
                                     sizeof(smartconfig_event_got_ssid_pswd_t::password)));
 
                 ESP_LOGI(_log_tag, "%s:%d Calling esp_wifi_set_config", __func__, __LINE__);
