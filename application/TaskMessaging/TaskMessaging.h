@@ -8,7 +8,7 @@
 #include <cassert>
 #include <memory>
 #include <mutex>
-//#include <vector>
+#include <utility>
 
 namespace TASKMESSAGING
 {
@@ -139,16 +139,18 @@ public:
 
 protected:
     // Normal constructor
-    constexpr QueueInterface_t(const size_t n_items,
-                                const size_t item_n_bytes, 
-                                const size_t id) :
+    QueueInterface_t(std::shared_ptr<QueueDefinition> h_queue,
+                        const size_t n_items,
+                        const size_t item_n_bytes, 
+                        const size_t id) :
         queue_len{n_items},
         item_n_bytes{item_n_bytes},
         id{id},
+        h_queue{h_queue}        
     {}
 
     // Copy constructor
-    constexpr QueueInterface_t(const QueueInterface_t& other) :
+    QueueInterface_t(const QueueInterface_t& other) :
         queue_len{other.queue_len},
         item_n_bytes{other.item_n_bytes},
         id{other.id},
@@ -167,10 +169,26 @@ public:
     DynamicQueue_t(const size_t n_items,
                     const size_t item_n_bytes, 
                     const size_t id) :
-        QueueInterface_t{n_items, item_n_bytes, id},
-        h_queue{xQueueCreate(this->queue_len, this->item_n_bytes), 
-                [](auto h){vQueueDelete(h);}}
+        QueueInterface_t{std::move(create_queue_shared_ptr(n_items, item_n_bytes)),
+                            n_items, item_n_bytes, id}
     {}
+
+private:
+    QueueHandle_t create_queue(const size_t n_items, const size_t item_n_bytes)
+    {
+        return xQueueCreate(n_items, item_n_bytes);
+    }
+
+    void delete_queue(QueueHandle_t h)
+    {
+        vQueueDelete(h);
+    }
+
+    std::shared_ptr<QueueDefinition> create_queue_shared_ptr(const size_t n_items, const size_t item_n_bytes)
+    {
+        return {create_queue(n_items, item_n_bytes), 
+                    [this](auto h){delete_queue(h);}};
+    }
 };
 
 template<typename T, size_t len>
@@ -178,16 +196,31 @@ class StaticQueue_t  : public QueueInterface_t
 {
 public:
     StaticQueue_t(const size_t id) :
-        QueueInterface_t{len, sizeof(T), id},
-        h_queue{xQueueCreateStatic(this->queue_len, this->item_n_bytes,
-                                    queue_storage, &queue_control_block), 
-                [](auto h){vQueueDelete(h);}}
+        QueueInterface_t{create_queue(len, sizeof(T)),
+                            len, sizeof(T), id}
     {}
 
     // TODO what if this class was destroyed but it had been copied?
     StaticQueue_t(const StaticQueue_t&) = delete;
 
 private:
+    QueueHandle_t create_queue(const size_t n_items, const size_t item_n_bytes)
+    {
+        return xQueueCreateStatic(n_items, item_n_bytes,
+                                    queue_storage, &queue_control_block);
+    }
+
+    void delete_queue(QueueHandle_t h)
+    {
+        vQueueDelete(h);
+    }
+
+    std::shared_ptr<QueueDefinition> create_queue_shared_ptr(const size_t n_items, const size_t item_n_bytes)
+    {
+        return {create_queue(n_items, item_n_bytes), 
+                    [this](auto h){delete_queue(h);}};
+    }
+
     StaticQueue_t   queue_control_block{};
     uint8_t         queue_storage[len * sizeof(T)]{};
 };
