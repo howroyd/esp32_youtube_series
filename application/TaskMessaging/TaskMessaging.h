@@ -13,16 +13,16 @@
 namespace TASKMESSAGING
 {
 
-class DynamicQueue_t
+class QueueInterface_t
 {
-    //friend class TaskMessagingBase; // TODO might not be req.
-
 public:
+    QueueInterface_t(void) = delete;
+
     const size_t        queue_len{0};
     const size_t        item_n_bytes{0};
     const size_t        id{0};
 
-    constexpr static const TickType_t wait_ticks{pdMS_TO_TICKS(1000)};
+    constexpr static const TickType_t wait_ticks{pdMS_TO_TICKS(0)};
 
     operator bool() const { return h_queue ? true : false; }
 
@@ -137,31 +137,59 @@ public:
         return pdPASS == xQueueReset(h_queue.get()); 
     }
 
-    DynamicQueue_t(void) = delete;
-
-    DynamicQueue_t(const size_t n_items,
-                    const size_t item_n_bytes, 
-                    const size_t id) :
+protected:
+    // Normal constructor
+    constexpr QueueInterface_t(const size_t n_items,
+                                const size_t item_n_bytes, 
+                                const size_t id) :
         queue_len{n_items},
         item_n_bytes{item_n_bytes},
         id{id},
-        h_queue(xQueueCreate(this->queue_len, this->item_n_bytes), 
-                [](auto h){vQueueDelete(h);})
-    {
-        assert(0 < queue_len); assert(0 < item_n_bytes);
-    }
+    {}
 
-    DynamicQueue_t(const DynamicQueue_t& other) :
+    // Copy constructor
+    constexpr QueueInterface_t(const QueueInterface_t& other) :
         queue_len{other.queue_len},
         item_n_bytes{other.item_n_bytes},
         id{other.id},
         h_queue{other.h_queue}
-    {}
+    {
+        assert(0 < queue_len); assert(0 < item_n_bytes);
+    }
 
-protected:
     std::shared_ptr<QueueDefinition>    h_queue;
     mutable std::recursive_mutex        mutx{};
 };
 
+class DynamicQueue_t : public QueueInterface_t
+{
+public:
+    DynamicQueue_t(const size_t n_items,
+                    const size_t item_n_bytes, 
+                    const size_t id) :
+        QueueInterface_t{n_items, item_n_bytes, id},
+        h_queue{xQueueCreate(this->queue_len, this->item_n_bytes), 
+                [](auto h){vQueueDelete(h);}}
+    {}
+};
+
+template<typename T, size_t len>
+class StaticQueue_t  : public QueueInterface_t
+{
+public:
+    StaticQueue_t(const size_t id) :
+        QueueInterface_t{len, sizeof(T), id},
+        h_queue{xQueueCreateStatic(this->queue_len, this->item_n_bytes,
+                                    queue_storage, &queue_control_block), 
+                [](auto h){vQueueDelete(h);}}
+    {}
+
+    // TODO what if this class was destroyed but it had been copied?
+    StaticQueue_t(const StaticQueue_t&) = delete;
+
+private:
+    StaticQueue_t   queue_control_block{};
+    uint8_t         queue_storage[len * sizeof(T)]{};
+};
 
 } // namespace TASKMESSAGING
