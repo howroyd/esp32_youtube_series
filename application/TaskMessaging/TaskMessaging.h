@@ -29,7 +29,7 @@ public:
     template <typename T>
     esp_err_t           send(T& item, const TickType_t wait_ticks=wait_ticks)
     {
-        std::lock_guard<std::recursive_mutex> _guard(mutx);
+        std::scoped_lock _guard(send_mutx);
 
         if (*this)
         {
@@ -49,7 +49,7 @@ public:
     template <typename T>
     esp_err_t           send_to_front(T& item, const TickType_t wait_ticks=wait_ticks)
     {
-        std::lock_guard<std::recursive_mutex> _guard(mutx);
+        std::scoped_lock _guard(send_mutx);
 
         if (*this)
         {
@@ -69,7 +69,7 @@ public:
     template <typename T>
     esp_err_t           receive(T& item, const TickType_t wait_ticks=wait_ticks)
     {
-        std::lock_guard<std::recursive_mutex> _guard(mutx);
+        std::scoped_lock _guard(receive_mutx);
 
         if (*this)
         {
@@ -89,7 +89,7 @@ public:
     template <typename T>
     esp_err_t           peek(T& item, const TickType_t wait_ticks=wait_ticks) const
     {
-        std::lock_guard<std::recursive_mutex> _guard(mutx);
+        std::scoped_lock _guard(receive_mutx);
 
         if (*this)
         {
@@ -108,7 +108,7 @@ public:
 
     size_t              n_items_waiting(void)   const
     {
-        std::lock_guard<std::recursive_mutex> _guard(mutx);
+        std::scoped_lock _guard(receive_mutx);
 
         if (h_queue)
             return uxQueueMessagesWaiting(h_queue.get());
@@ -117,7 +117,7 @@ public:
 
     size_t              n_free_spaces(void)     const
     {
-        std::lock_guard<std::recursive_mutex> _guard(mutx);
+        std::scoped_lock _guard(receive_mutx);
 
         if (h_queue)
             return uxQueueSpacesAvailable(h_queue.get());
@@ -132,7 +132,7 @@ public:
 
     bool                clear(void)
     { 
-        std::lock_guard<std::recursive_mutex> _guard(mutx);
+        std::scoped_lock _guard(send_mutx, receive_mutx);
 
         return pdPASS == xQueueReset(h_queue.get()); 
     }
@@ -160,7 +160,8 @@ protected:
     }
 
     std::shared_ptr<QueueDefinition>    h_queue;
-    mutable std::recursive_mutex        mutx{};
+    mutable std::recursive_mutex        send_mutx{};
+    mutable std::recursive_mutex        receive_mutx{};
 };
 
 class DynamicQueue_t : public QueueInterface_t
@@ -181,6 +182,7 @@ private:
 
     void delete_queue(QueueHandle_t h)
     {
+        std::scoped_lock _guard(send_mutx, receive_mutx);
         vQueueDelete(h);
     }
 
@@ -212,6 +214,7 @@ private:
 
     void delete_queue(QueueHandle_t h)
     {
+        std::scoped_lock _guard(send_mutx, receive_mutx);
         vQueueDelete(h);
     }
 
