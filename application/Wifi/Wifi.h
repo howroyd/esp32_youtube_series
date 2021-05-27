@@ -16,15 +16,17 @@
 namespace WIFI
 {
 
+/// @brief Non-volatile Storage Partition Interface
+///
+/// @note Threadsafe
 class Wifi
 {
-    constexpr static const char* _log_tag{"WiFi"};
+    constexpr static const char* _log_tag{"WiFi"};          ///< cstring of logging tag
 
-    constexpr static const char* ssid{"GreenGiant-TEST"};
-    constexpr static const char* password{"GreenGiant"};
+    constexpr static const char* ssid{"GreenGiant-TEST"};   ///< cstring of hard coded WiFi SSID
+    constexpr static const char* password{"GreenGiant"};    ///< cstring of hard coded WiFi password
 
 public:
-    // Strongly typed enum to define our state
     enum class state_e
     {
         NOT_INITIALISED,
@@ -35,10 +37,12 @@ public:
         CONNECTED,
         DISCONNECTED,
         ERROR
-    };
+    }; ///< WiFi states
 
     // "Rule of 5" Constructors and assignment operators
     // Ref: https://en.cppreference.com/w/cpp/language/rule_of_three
+
+    /// @brief WiFi Instance Constructor
     Wifi(void);
     ~Wifi(void)                     = default;
     Wifi(const Wifi&)               = default;
@@ -46,27 +50,59 @@ public:
     Wifi& operator=(const Wifi&)    = default;
     Wifi& operator=(Wifi&&)         = default;
 
+	/// @brief Initialise WiFi
+	///
+    /// @note Non-blocking
+    ///
+	/// @return 
+	/// 	- ESP_OK if WIFI driver initialised
+    ///     - ESP_FAIL if we are in the ERROR state (//TODO how to recover?)
+    ///     - other error codes from underlying API
     esp_err_t init(void);
+
+	/// @brief Start WiFi and connect to AP (non-blocking)
+	///
+    /// @note Implicitly calls init if required
+    /// @note Non-blocking
+    ///
+	/// @return 
+	/// 	- ESP_OK if WIFI driver running
+    ///     - ESP_FAIL if we are in the ERROR state (//TODO how to recover?)
+    ///     - other error codes from underlying API
     esp_err_t begin(void);
 
-    constexpr static const state_e& get_state(void) { return _state; }
+    constexpr static const state_e& get_state(void) { return _state; } ///< Current WiFi state
 
     constexpr static const char* get_mac(void) 
-        { return mac_addr_cstr; }
+        { return mac_addr_cstr; } ///< Device specific WiFi MAC address
 
 private:
     enum class smartconfig_state_e
     {
         NOT_STARTED,
         STARTED
-    };
-    static smartconfig_state_e  smartconfig_state;
+    }; ///< SmartConfig states
 
+    static smartconfig_state_e  smartconfig_state; ///< Current SmartConfig state
+
+	/// @brief Initialise WiFi
+	///
+    /// @note Non-blocking
+    ///
+	/// @return 
+	/// 	- ESP_OK if WIFI driver initialised
+    ///     - ESP_FAIL if we are in the ERROR state (//TODO how to recover?)
+    ///     - other error codes from underlying API
     static esp_err_t                    _init(void);
-    static wifi_init_config_t           wifi_init_config;
-    static wifi_config_t                wifi_config;
-    static smartconfig_start_config_t   smartconfig_config;
 
+    static wifi_init_config_t           wifi_init_config;   ///< WiFi init config
+    static wifi_config_t                wifi_config;        ///< WiFi config containing SSID & password
+    static smartconfig_start_config_t   smartconfig_config; ///< SmartConfig config
+
+	/// @brief Check if current credentials are not empty cstrings
+    ///
+	/// @return 
+	/// 	- true if SSID and password are not null, else false
     static bool empty_credentials(void)
     {
         if ('\0' == wifi_config.sta.ssid[0] ||
@@ -88,7 +124,11 @@ private:
 
     static state_e _state;
 
-    // Get the MAC from the API and convert to ASCII HEX
+    /// @brief Get the MAC from the API and convert to ASCII HEX
+    ///
+	/// @return 
+	/// 	- ESP_OK if MAC obtained
+    ///     - other error codes from underlying API
     static esp_err_t _get_mac(void);
 
     static char mac_addr_cstr[13];  ///< Buffer to hold MAC as cstring
@@ -96,7 +136,7 @@ private:
     static std::mutex connect_mutx; ///< Connect mutex
     static std::mutex state_mutx;   ///< State change mutex
 
-    static NVS::Nvs nvs;
+    static NVS::Nvs nvs;            ///< NVS instance for saving SSID and password
 };
 
 
