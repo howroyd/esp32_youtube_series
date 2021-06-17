@@ -50,7 +50,7 @@
 			"*.inc": "cpp"
 		},
 		"terminal.integrated.shell.windows": "C:\\WINDOWS\\system32\\cmd.exe",
-		"window.zoomLevel": 2,
+		"window.zoomLevel": 1,
 		"todo-tree.general.tags": [
 			"BUG",
 			"HACK",
@@ -61,6 +61,8 @@
 		"idf.portWin": "COM6",
 		"stm32-for-vscode.openOCDPath": false,
 		"stm32-for-vscode.makePath": false,
-		"stm32-for-vscode.armToolchainPath": false
+		"stm32-for-vscode.armToolchainPath": false,
+		"editor.fontSize": 10,
+		"editor.accessibilityPageSize": 8
 	}
 }
