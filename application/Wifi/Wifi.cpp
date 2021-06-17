@@ -8,15 +8,15 @@ char                Wifi::mac_addr_cstr[]{};    ///< Buffer to hold MAC as cstri
 std::mutex          Wifi::init_mutx{};          ///< Initialisation mutex
 std::mutex          Wifi::connect_mutx{};       ///< Connect mutex
 std::mutex          Wifi::state_mutx{};         ///< State change mutex
-Wifi::state_e       Wifi::_state{state_e::NOT_INITIALISED};
-wifi_init_config_t  Wifi::wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
-wifi_config_t       Wifi::wifi_config{};
-NVS::Nvs            Wifi::nvs{};
+Wifi::state_e       Wifi::_state{state_e::NOT_INITIALISED};                 ///< Current WiFi state
+wifi_init_config_t  Wifi::wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();    ///< WiFi init config
+wifi_config_t       Wifi::wifi_config{};        ///< WiFi config containing SSID & password
+NVS::Nvs            Wifi::nvs{};                ///< NVS instance for saving SSID and password
 
 Wifi::smartconfig_state_e   Wifi::smartconfig_state{smartconfig_state_e::NOT_STARTED};
 smartconfig_start_config_t  Wifi::smartconfig_config{true, false, nullptr};
 
-// Wifi Constructor
+/// @brief WiFi Instance Constructor
 Wifi::Wifi(void)
 {
     // Aquire our initialisation mutex to ensure only one
@@ -140,7 +140,7 @@ void Wifi::sc_event_handler(void* arg, esp_event_base_t event_base,
         {
         case SC_EVENT_GOT_SSID_PSWD:
         {
-            smartconfig_event_got_ssid_pswd_t* const
+            /*const*/ smartconfig_event_got_ssid_pswd_t* const
                 data{static_cast<smartconfig_event_got_ssid_pswd_t*>(event_data)};
 
             if (_state == state_e::READY_TO_CONNECT)
@@ -190,23 +190,18 @@ void Wifi::sc_event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
+/// @brief Initialise WiFi
+///
+/// @note Non-blocking
+///
+/// @return 
+/// 	- ESP_OK if WIFI driver initialised
+///     - ESP_FAIL if we are in the ERROR state (//TODO how to recover?)
+///     - other error codes from underlying API
 esp_err_t Wifi::init(void)
 {
     return _init();
 }
-
-
-/*
-const size_t ssid_len_to_copy       = std::min(strlen(ssid), 
-                                sizeof(wifi_config.sta.ssid));
-
-memcpy(wifi_config.sta.ssid, ssid, ssid_len_to_copy);
-
-const size_t password_len_to_copy   = std::min(strlen(password),
-                                        sizeof(wifi_config.sta.password));
-
-memcpy(wifi_config.sta.password, password, password_len_to_copy);
-*/
 
 esp_err_t Wifi::begin(void)
 {
@@ -257,6 +252,14 @@ esp_err_t Wifi::begin(void)
     return status;
 }
 
+/// @brief Initialise WiFi
+///
+/// @note Non-blocking
+///
+/// @return 
+/// 	- ESP_OK if WIFI driver initialised
+///     - ESP_FAIL if we are in the ERROR state (//TODO how to recover?)
+///     - other error codes from underlying API
 esp_err_t Wifi::_init(void)
 {
     ESP_LOGI(_log_tag, "%s:%d Waiting for init_mutx", __func__, __LINE__);
@@ -371,7 +374,11 @@ esp_err_t Wifi::_init(void)
     return status;
 }
 
-// Get the MAC from the API and convert to ASCII HEX
+/// @brief Get the MAC from the API and convert to ASCII HEX
+///
+/// @return 
+/// 	- ESP_OK if MAC obtained
+///     - other error codes from underlying API
 esp_err_t Wifi::_get_mac(void)
 {
     uint8_t mac_byte_buffer[6]{};   ///< Buffer to hold MAC as bytes

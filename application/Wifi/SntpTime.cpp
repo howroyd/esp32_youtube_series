@@ -6,16 +6,25 @@
 namespace SNTP
 {
 
-std::chrono::_V2::system_clock::time_point Sntp::last_update{};
-Sntp::time_source_e Sntp::source{Sntp::time_source_e::TIME_SRC_UNKNOWN};
-bool Sntp::_running{false};
+std::chrono::_V2::system_clock::time_point Sntp::last_update{}; ///< Time of the last NTP update
+Sntp::time_source_e Sntp::source{Sntp::time_source_e::TIME_SRC_UNKNOWN}; ///< SNTP API time source
+bool Sntp::_running{false}; ///< SNTP running flag
 
+/// @brief Callback for when a new SNTP update happens
+///
+/// @param[in] tv : ctime timeval struct pointer
 void Sntp::callback_on_ntp_update(timeval* tv)
 {
     ESP_LOGD(_log_tag, "Time is %s", ascii_time_now()); // TODO remove extra newline
     // TODO update "last_update"
 }
 
+/// @brief Initialise and start the SNTP service (blocking)
+///
+/// @attention Will block until WiFi is connected
+///
+/// @return 
+/// 	- ESP_OK if SNTP running, else ESP_FAIL
 esp_err_t Sntp::init(void)
 {
     if (!_running)
@@ -51,6 +60,6 @@ esp_err_t Sntp::init(void)
     const std::time_t time_now{std::chrono::system_clock::to_time_t(time_point_now())};
 
     return std::asctime(std::localtime(&time_now));
-}
+} ///< Return the current time as a cstring
 
 } // namespace SNTP
