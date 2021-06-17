@@ -3,15 +3,17 @@
 namespace WIFI
 {
 
+LOGGING::Logging            Wifi::log{};
+
 // Wifi statics
-char                Wifi::mac_addr_cstr[]{};    ///< Buffer to hold MAC as cstring
-std::mutex          Wifi::init_mutx{};          ///< Initialisation mutex
-std::mutex          Wifi::connect_mutx{};       ///< Connect mutex
-std::mutex          Wifi::state_mutx{};         ///< State change mutex
-Wifi::state_e       Wifi::_state{state_e::NOT_INITIALISED};                 ///< Current WiFi state
-wifi_init_config_t  Wifi::wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();    ///< WiFi init config
-wifi_config_t       Wifi::wifi_config{};        ///< WiFi config containing SSID & password
-NVS::Nvs            Wifi::nvs{};                ///< NVS instance for saving SSID and password
+char                        Wifi::mac_addr_cstr[]{};    ///< Buffer to hold MAC as cstring
+std::recursive_mutex        Wifi::init_mutx{};          ///< Initialisation mutex
+std::recursive_mutex        Wifi::connect_mutx{};       ///< Connect mutex
+std::recursive_mutex        Wifi::state_mutx{};         ///< State change mutex
+Wifi::state_e               Wifi::_state{state_e::NOT_INITIALISED};                 ///< Current WiFi state
+wifi_init_config_t          Wifi::wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();    ///< WiFi init config
+wifi_config_t               Wifi::wifi_config{};        ///< WiFi config containing SSID & password
+NVS::Nvs                    Wifi::nvs{};                ///< NVS instance for saving SSID and password
 
 Wifi::smartconfig_state_e   Wifi::smartconfig_state{smartconfig_state_e::NOT_STARTED};
 smartconfig_start_config_t  Wifi::smartconfig_config{true, false, nullptr};
@@ -22,7 +24,7 @@ Wifi::Wifi(void)
     // Aquire our initialisation mutex to ensure only one
     //   thread (multi-cpu safe) is running this
     //   constructor at once.  No running twice in parallel!
-    std::lock_guard<std::mutex> guard(init_mutx);
+    const std::scoped_lock _guard(init_mutx);
 
     // Check if the MAC cstring currently begins with a
     //   nullptr, i.e. is default initialised, not set
@@ -40,6 +42,7 @@ void Wifi::event_handler(void* arg, esp_event_base_t event_base,
     if (WIFI_EVENT == event_base)
     {
         ESP_LOGI(_log_tag, "%s:%d Got a WIFI_EVENT", __func__, __LINE__);
+        log.log(ESP_LOG_INFO, "Got WiFi event!");
         return wifi_event_handler(arg, event_base, event_id, event_data);
     }
     else if (IP_EVENT == event_base)
@@ -60,14 +63,14 @@ void Wifi::wifi_event_handler(void* arg, esp_event_base_t event_base,
     {
         const wifi_event_t event_type{static_cast<wifi_event_t>(event_id)};
 
-        ESP_LOGI(_log_tag, "%s:%d Event ID %d", __func__, __LINE__, event_id);
+        ESP_LOGD(_log_tag, "%s:%d Event ID %d", __func__, __LINE__, event_id);
 
         switch(event_type)
         {
         case WIFI_EVENT_STA_START:
         {
-            ESP_LOGI(_log_tag, "%s:%d STA_START, waiting for state_mutx", __func__, __LINE__);
-            std::lock_guard<std::mutex> state_guard(state_mutx); // TODO waiting for mutx in callback
+            ESP_LOGD(_log_tag, "%s:%d STA_START, waiting for state_mutx", __func__, __LINE__);
+            const std::scoped_lock _guard(state_mutx); // FIXME waiting for mutex in a callback
             _state = state_e::READY_TO_CONNECT;
             ESP_LOGI(_log_tag, "%s:%d READY_TO_CONNECT", __func__, __LINE__);
             break;
@@ -75,8 +78,8 @@ void Wifi::wifi_event_handler(void* arg, esp_event_base_t event_base,
 
         case WIFI_EVENT_STA_CONNECTED:
         {
-            ESP_LOGI(_log_tag, "%s:%d STA_CONNECTED, waiting for state_mutx", __func__, __LINE__);
-            std::lock_guard<std::mutex> state_guard(state_mutx);
+            ESP_LOGD(_log_tag, "%s:%d STA_CONNECTED, waiting for state_mutx", __func__, __LINE__);
+            const std::scoped_lock _guard(state_mutx);
             ESP_LOGI(_log_tag, "%s:%d WAITING_FOR_IP", __func__, __LINE__);
             _state = state_e::WAITING_FOR_IP;
             break;
@@ -97,14 +100,14 @@ void Wifi::ip_event_handler(void* arg, esp_event_base_t event_base,
     {
         const ip_event_t event_type{static_cast<ip_event_t>(event_id)};
 
-        ESP_LOGI(_log_tag, "%s:%d Event ID %d", __func__, __LINE__, event_id);
+        ESP_LOGD(_log_tag, "%s:%d Event ID %d", __func__, __LINE__, event_id);
 
         switch(event_type)
         {
         case IP_EVENT_STA_GOT_IP:
         {
-            ESP_LOGI(_log_tag, "%s:%d Got IP, waiting for state_mutx", __func__, __LINE__);
-            std::lock_guard<std::mutex> guard(state_mutx);
+            ESP_LOGD(_log_tag, "%s:%d Got IP, waiting for state_mutx", __func__, __LINE__);
+            const std::scoped_lock _guard(state_mutx);
             _state = state_e::CONNECTED;
             ESP_LOGI(_log_tag, "%s:%d CONNECTED!", __func__, __LINE__);
             break;
@@ -113,7 +116,7 @@ void Wifi::ip_event_handler(void* arg, esp_event_base_t event_base,
         case IP_EVENT_STA_LOST_IP:
         {
             ESP_LOGW(_log_tag, "%s:%d Lost IP, waiting for state_mutx", __func__, __LINE__);
-            std::lock_guard<std::mutex> guard(state_mutx);
+            const std::scoped_lock _guard(state_mutx);
             _state = state_e::WAITING_FOR_IP;
             ESP_LOGI(_log_tag, "%s:%d WAITING_FOR_IP", __func__, __LINE__);
             break;
@@ -134,7 +137,7 @@ void Wifi::sc_event_handler(void* arg, esp_event_base_t event_base,
     {
         const smartconfig_event_t event_type{static_cast<smartconfig_event_t>(event_id)};
 
-        ESP_LOGI(_log_tag, "%s:%d Event ID %d", __func__, __LINE__, event_id);
+        ESP_LOGD(_log_tag, "%s:%d Event ID %d", __func__, __LINE__, event_id);
 
         switch(event_type)
         {
@@ -166,8 +169,8 @@ void Wifi::sc_event_handler(void* arg, esp_event_base_t event_base,
 
                 if (ESP_OK == status)
                 {
-                    ESP_LOGI(_log_tag, "%s:%d Waiting for connect_mutx", __func__, __LINE__);
-                    std::lock_guard<std::mutex> connect_guard(connect_mutx);
+                    ESP_LOGD(_log_tag, "%s:%d Waiting for connect_mutx", __func__, __LINE__);
+                    const std::scoped_lock _guard(connect_mutx);
 
                     ESP_LOGI(_log_tag, "%s:%d Calling esp_wifi_connect", __func__, __LINE__);
                     status = esp_wifi_connect();
@@ -177,8 +180,8 @@ void Wifi::sc_event_handler(void* arg, esp_event_base_t event_base,
 
                 if (ESP_OK == status)
                 {
-                    ESP_LOGI(_log_tag, "%s:%d Waiting for state_mutx", __func__, __LINE__);
-                    std::lock_guard<std::mutex> state_guard(state_mutx);
+                    ESP_LOGD(_log_tag, "%s:%d Waiting for state_mutx", __func__, __LINE__);
+                    const std::scoped_lock _guard(state_mutx);
                     _state = state_e::CONNECTING;
                 }
             }
@@ -198,20 +201,27 @@ void Wifi::sc_event_handler(void* arg, esp_event_base_t event_base,
 /// 	- ESP_OK if WIFI driver initialised
 ///     - ESP_FAIL if we are in the ERROR state (//TODO how to recover?)
 ///     - other error codes from underlying API
-esp_err_t Wifi::init(void)
+[[nodiscard]] esp_err_t Wifi::init(void)
 {
     return _init();
 }
 
-esp_err_t Wifi::begin(void)
+/// @brief Start WiFi and connect to AP (non-blocking)
+///
+/// @note Implicitly calls init if required
+/// @note Non-blocking
+///
+/// @return 
+/// 	- ESP_OK if WIFI driver running
+///     - ESP_FAIL if we are in the ERROR state (//TODO how to recover?)
+///     - other error codes from underlying API
+[[nodiscard]] esp_err_t Wifi::begin(void)
 {
-    ESP_LOGI(_log_tag, "%s:%d Waiting for connect_mutx", __func__, __LINE__);
-    std::lock_guard<std::mutex> connect_guard(connect_mutx);
+    ESP_LOGD(_log_tag, "%s:%d Waiting for connect_mutx and state_mutx", __func__, __LINE__);
+    const std::scoped_lock _guard(connect_mutx, state_mutx);
 
     esp_err_t status{ESP_OK};
 
-    ESP_LOGI(_log_tag, "%s:%d Waiting for state_mutx", __func__, __LINE__);
-    std::lock_guard<std::mutex> state_guard(state_mutx);
     switch(_state)
     {
     case state_e::READY_TO_CONNECT:
@@ -262,13 +272,10 @@ esp_err_t Wifi::begin(void)
 ///     - other error codes from underlying API
 esp_err_t Wifi::_init(void)
 {
-    ESP_LOGI(_log_tag, "%s:%d Waiting for init_mutx", __func__, __LINE__);
-    std::lock_guard<std::mutex> init_guard(init_mutx);
+    ESP_LOGD(_log_tag, "%s:%d Waiting for init_mutx and state_mutx", __func__, __LINE__);
+    const std::scoped_lock _guard(init_mutx, state_mutx);
 
     esp_err_t status{ESP_OK};
-
-    ESP_LOGI(_log_tag, "%s:%d Waiting for state_mutx", __func__, __LINE__);
-    std::lock_guard<std::mutex> state_guard(state_mutx);
 
     if (state_e::NOT_INITIALISED == _state)
     {
@@ -379,7 +386,7 @@ esp_err_t Wifi::_init(void)
 /// @return 
 /// 	- ESP_OK if MAC obtained
 ///     - other error codes from underlying API
-esp_err_t Wifi::_get_mac(void)
+[[nodiscard]] esp_err_t Wifi::_get_mac(void)
 {
     uint8_t mac_byte_buffer[6]{};   ///< Buffer to hold MAC as bytes
 

@@ -13,6 +13,8 @@
 
 #include "../Nvs32/Nvs32.h"
 
+#include "Logging.h"
+
 namespace WIFI
 {
 
@@ -25,6 +27,8 @@ class Wifi
 
     constexpr static const char* ssid{"GreenGiant-TEST"};   ///< cstring of hard coded WiFi SSID
     constexpr static const char* password{"GreenGiant"};    ///< cstring of hard coded WiFi password
+
+    static LOGGING::Logging log;
 
 public:
     enum class state_e
@@ -58,7 +62,7 @@ public:
 	/// 	- ESP_OK if WIFI driver initialised
     ///     - ESP_FAIL if we are in the ERROR state (//TODO how to recover?)
     ///     - other error codes from underlying API
-    esp_err_t init(void);
+    [[nodiscard]] esp_err_t init(void);
 
 	/// @brief Start WiFi and connect to AP (non-blocking)
 	///
@@ -69,12 +73,13 @@ public:
 	/// 	- ESP_OK if WIFI driver running
     ///     - ESP_FAIL if we are in the ERROR state (//TODO how to recover?)
     ///     - other error codes from underlying API
-    esp_err_t begin(void);
+    [[nodiscard]] esp_err_t begin(void);
 
-    constexpr static const state_e& get_state(void) { return _state; } ///< Current WiFi state
+    [[nodiscard]] constexpr static const state_e& get_state(void)
+        { return _state; } ///< Current WiFi state
 
-    constexpr static const char* get_mac(void) 
-        { return mac_addr_cstr; } ///< Device specific WiFi MAC address
+    [[nodiscard]] constexpr static const char* get_mac(void) 
+        { return mac_addr_cstr; } ///< Device specific WiFi MAC address cstring
 
 private:
     enum class smartconfig_state_e
@@ -93,7 +98,7 @@ private:
 	/// 	- ESP_OK if WIFI driver initialised
     ///     - ESP_FAIL if we are in the ERROR state (//TODO how to recover?)
     ///     - other error codes from underlying API
-    static esp_err_t                    _init(void);
+    [[nodiscard]] static esp_err_t      _init(void);
 
     static wifi_init_config_t           wifi_init_config;   ///< WiFi init config
     static wifi_config_t                wifi_config;        ///< WiFi config containing SSID & password
@@ -103,7 +108,7 @@ private:
     ///
 	/// @return 
 	/// 	- true if SSID and password are not null, else false
-    static bool empty_credentials(void)
+    [[nodiscard]] static bool empty_credentials(void)
     {
         if ('\0' == wifi_config.sta.ssid[0] ||
             '\0' == wifi_config.sta.password[0])
@@ -129,14 +134,14 @@ private:
 	/// @return 
 	/// 	- ESP_OK if MAC obtained
     ///     - other error codes from underlying API
-    static esp_err_t _get_mac(void);
+    [[nodiscard]] static esp_err_t _get_mac(void);
 
-    static char mac_addr_cstr[13];  ///< Buffer to hold MAC as cstring
-    static std::mutex init_mutx;    ///< Initialisation mutex
-    static std::mutex connect_mutx; ///< Connect mutex
-    static std::mutex state_mutx;   ///< State change mutex
+    static char mac_addr_cstr[13];              ///< Buffer to hold MAC as cstring
+    static std::recursive_mutex init_mutx;      ///< Initialisation mutex
+    static std::recursive_mutex connect_mutx;   ///< Connect mutex
+    static std::recursive_mutex state_mutx;     ///< State change mutex
 
-    static NVS::Nvs nvs;            ///< NVS instance for saving SSID and password
+    static NVS::Nvs nvs;                        ///< NVS instance for saving SSID and password
 };
 
 

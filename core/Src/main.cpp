@@ -35,6 +35,12 @@ extern "C" void app_main(void)
     ESP_LOGI(LOG_TAG, "Initialising NVS");
     ESP_ERROR_CHECK(nvs_flash_init());
 
+    while (true)
+    {
+        vTaskDelay(pdSECOND *2 );
+        my_main.log.log(ESP_LOG_INFO, "Hello world!");
+    }
+
     std::thread count_up(foo, false);
     std::thread count_down(foo, true);
 

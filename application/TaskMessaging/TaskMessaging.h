@@ -34,7 +34,7 @@ public:
     /// e.g. if (instance) { // ... do something }
     ///
     /// @return true if the FreeRTOS queue handle is not nullptr else false
-    operator bool() const { return h_queue ? true : false; }
+    [[nodiscard]] operator bool() const { return h_queue ? true : false; }
 
     /// @brief Send an item to the queue
     ///
@@ -49,7 +49,7 @@ public:
     ///     - ESP_ERR_NO_MEM if the queue is currently full
     ///     - ESP_ERR_INVALID_STATE if the queue is corrupt or not constructed
     template <typename T>
-    esp_err_t           send(const T& item, const TickType_t wait_ticks=wait_ticks)
+    esp_err_t send(const T& item, const TickType_t wait_ticks=wait_ticks)
     {
         std::scoped_lock _guard(send_mutx);
 
@@ -81,7 +81,7 @@ public:
     ///     - ESP_ERR_NO_MEM if the queue is currently full
     ///     - ESP_ERR_INVALID_STATE if the queue is corrupt or not constructed
     template <typename T>
-    esp_err_t           send_to_front(const T& item, const TickType_t wait_ticks=wait_ticks)
+    esp_err_t send_to_front(const T& item, const TickType_t wait_ticks=wait_ticks)
     {
         std::scoped_lock _guard(send_mutx);
 
@@ -113,7 +113,7 @@ public:
     ///     - ESP_ERR_NOT_FOUND if the queue is empty
     ///     - ESP_ERR_INVALID_STATE if the queue is corrupt or not constructed
     template <typename T>
-    esp_err_t           receive(T& item, const TickType_t wait_ticks=wait_ticks)
+    [[nodiscard]] esp_err_t receive(T& item, const TickType_t wait_ticks=wait_ticks)
     {
         std::scoped_lock _guard(receive_mutx);
 
@@ -145,7 +145,7 @@ public:
     ///     - ESP_ERR_NOT_FOUND if the queue is empty
     ///     - ESP_ERR_INVALID_STATE if the queue is corrupt or not constructed
     template <typename T>
-    esp_err_t           peek(T& item, const TickType_t wait_ticks=wait_ticks) const
+    [[nodiscard]] esp_err_t peek(T& item, const TickType_t wait_ticks=wait_ticks) const
     {
         std::scoped_lock _guard(receive_mutx);
 
@@ -167,7 +167,7 @@ public:
     /// @brief Number of items currently in the queue
     ///
     /// @return Number of items currently in the queue
-    size_t              n_items_waiting(void)   const
+    [[nodiscard]] size_t n_items_waiting(void) const
     {
         std::scoped_lock _guard(receive_mutx);
 
@@ -179,7 +179,7 @@ public:
     /// @brief Number of free spaces in the queue
     ///
     /// @return Number of free spaces in the queue
-    size_t              n_free_spaces(void)     const
+    [[nodiscard]] size_t n_free_spaces(void) const
     {
         std::scoped_lock _guard(receive_mutx);
 
@@ -191,19 +191,19 @@ public:
     /// @brief Is the queue currently empty
     ///
     /// @return true if the queue is empty else false
-    bool                empty(void)             const
+    [[nodiscard]] bool empty(void) const
         { return 0 == n_items_waiting(); }
 
     /// @brief Is the queue currently full
     ///
     /// @return true if the queue is full else false
-    bool                full(void)              const 
+    [[nodiscard]] bool full(void) const 
         { return 0 == n_free_spaces(); }
 
     /// @brief Remove all items (if any) currently in the queue
     ///
     /// @return true if success else false
-    bool                clear(void)
+    [[nodiscard]] bool clear(void)
     { 
         std::scoped_lock _guard(send_mutx, receive_mutx);
 
@@ -300,7 +300,7 @@ private:
     /// @param[in] item_n_bytes : number of bytes that one item requires
     ///
     /// @return A managed std::shared_ptr to the FreeRTOS queue
-    std::shared_ptr<QueueDefinition> create_queue_shared_ptr(const size_t n_items, const size_t item_n_bytes)
+    [[nodiscard]] std::shared_ptr<QueueDefinition> create_queue_shared_ptr(const size_t n_items, const size_t item_n_bytes)
     {
         return {create_queue(n_items, item_n_bytes), 
                     [this](auto h){delete_queue(h);}};
@@ -367,7 +367,7 @@ private:
     /// @param[in] item_n_bytes : number of bytes that one item requires
     ///
     /// @return A managed std::shared_ptr to the FreeRTOS queue
-    std::shared_ptr<QueueDefinition> create_queue_shared_ptr(const size_t n_items, const size_t item_n_bytes)
+    [[nodiscard]] std::shared_ptr<QueueDefinition> create_queue_shared_ptr(const size_t n_items, const size_t item_n_bytes)
     {
         return {create_queue(n_items, item_n_bytes), 
                     [this](auto h){delete_queue(h);}};

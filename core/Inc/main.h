@@ -10,6 +10,7 @@
 #include "Gpio.h"
 #include "Wifi.h"
 #include "SntpTime.h"
+#include "Logging.h"
 class Main final
 {
 public:
@@ -22,4 +23,6 @@ public:
     Gpio::GpioOutput led{GPIO_NUM_27, true};
     WIFI::Wifi wifi;
     SNTP::Sntp& sntp;
+
+    LOGGING::Logging log;
 };

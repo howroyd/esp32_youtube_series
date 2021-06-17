@@ -8,4 +8,5 @@ idf_component_register(SRCS ${SOURCES}
                             esp_event 
                             nvs_flash
                             Gpio
-                            Wifi)
+                            Wifi
+                            Logging)

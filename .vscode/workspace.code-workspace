@@ -63,6 +63,7 @@
 		"stm32-for-vscode.makePath": false,
 		"stm32-for-vscode.armToolchainPath": false,
 		"editor.fontSize": 10,
-		"editor.accessibilityPageSize": 8
+		"editor.accessibilityPageSize": 8,
+		"idf.flashType": "UART"
 	}
 }
