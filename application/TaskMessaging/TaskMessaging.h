@@ -81,7 +81,7 @@ public:
     ///     - ESP_ERR_NO_MEM if the queue is currently full
     ///     - ESP_ERR_INVALID_STATE if the queue is corrupt or not constructed
     template <typename T>
-    esp_err_t           send_to_front(T& item, const TickType_t wait_ticks=wait_ticks)
+    esp_err_t           send_to_front(const T& item, const TickType_t wait_ticks=wait_ticks)
     {
         std::scoped_lock _guard(send_mutx);
 
