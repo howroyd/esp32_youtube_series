@@ -10,20 +10,36 @@ static Main my_main;
 
 static void foo(const bool countdown = false)
 {
+    const char* instance_cstr = countdown ? "down" : "up";
     constexpr static const int max_val{5};
     constexpr static const int min_val{0};
     int ctr{countdown ? max_val : min_val};
 
+    char buf[100]{};
+
     while (true)
     {
-        ESP_LOGI(__func__, "%s %d",
-                            countdown ? "down" : "up",
-                            countdown ? ctr-- : ctr++);
-        
-        if      (ctr >= max_val) ctr = min_val;
-        else if (ctr <= min_val) ctr = max_val;
+        {
+            std::unique_lock<std::recursive_timed_mutex> loglock;
+            if (ESP_OK == LOG.lock(loglock, std::chrono::milliseconds(250)))
+            {
+                sprintf(buf, "%s %d",
+                                instance_cstr,
+                                countdown ? ctr-- : ctr++);
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
+                LOG.info(buf);
+
+                if      (ctr >= max_val) ctr = min_val;
+                else if (ctr <= min_val) ctr = max_val;
+
+                vTaskDelay(pdMS_TO_TICKS(750));
+
+                LOG.info(std::string("Releasing the logging lock for ") + instance_cstr);
+            }
+            else LOG.warning(std::string("Failed to aquire logging lock for ") + instance_cstr);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 
@@ -34,12 +50,6 @@ extern "C" void app_main(void)
 
     ESP_LOGI(LOG_TAG, "Initialising NVS");
     ESP_ERROR_CHECK(nvs_flash_init());
-
-    while (true)
-    {
-        vTaskDelay(pdSECOND *2 );
-        my_main.log.log(ESP_LOG_INFO, "Hello world!");
-    }
 
     std::thread count_up(foo, false);
     std::thread count_down(foo, true);

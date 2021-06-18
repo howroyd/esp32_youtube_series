@@ -23,6 +23,4 @@ public:
     Gpio::GpioOutput led{GPIO_NUM_27, true};
     WIFI::Wifi wifi;
     SNTP::Sntp& sntp;
-
-    LOGGING::Logging log;
 };
