@@ -6,7 +6,9 @@
 #include <chrono>
 #include <experimental/source_location>
 #include <mutex>
+#include <sstream>
 #include <string>
+#include <utility>
 
 namespace LOGGING
 {
@@ -32,13 +34,13 @@ public:
     ///
 	/// @return 
 	/// 	- ESP_OK if message logged
-    ///     - ESP_ERR_NOT_IMPLEMENTED if requested level is below our default minimum
-    ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
+    ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
     static esp_err_t log(const esp_log_level_t level,
                             const std::string_view& msg,
                             const source_location& location = source_location::current())
     {
-        if constexpr (default_level < level) return ESP_ERR_NOT_IMPLEMENTED;
+        if (default_level < level) return ESP_ERR_INVALID_STATE;
         
         if (mutx.try_lock_for(defalt_mutex_wait))
         {
@@ -65,7 +67,7 @@ public:
     ///
 	/// @return 
 	/// 	- ESP_OK if message logged
-    ///     - ESP_ERR_NOT_IMPLEMENTED if requested level is below our default minimum
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
     esp_err_t operator() (const esp_log_level_t level,
                             const std::string_view& msg,
@@ -100,7 +102,7 @@ public:
     ///
 	/// @return 
 	/// 	- ESP_OK if message logged
-    ///     - ESP_ERR_NOT_IMPLEMENTED if requested level is below our default minimum
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
     static esp_err_t warning(const std::string_view& msg,
                                 const source_location& location = source_location::current())
@@ -118,7 +120,7 @@ public:
     ///
 	/// @return 
 	/// 	- ESP_OK if message logged
-    ///     - ESP_ERR_NOT_IMPLEMENTED if requested level is below our default minimum
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
     static esp_err_t info(const std::string_view& msg,
                             const source_location& location = source_location::current())
@@ -136,7 +138,7 @@ public:
     ///
 	/// @return 
 	/// 	- ESP_OK if message logged
-    ///     - ESP_ERR_NOT_IMPLEMENTED if requested level is below our default minimum
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
     static esp_err_t debug(const std::string_view& msg,
                             const source_location& location = source_location::current())
@@ -154,7 +156,7 @@ public:
     ///
 	/// @return 
 	/// 	- ESP_OK if message logged
-    ///     - ESP_ERR_NOT_IMPLEMENTED if requested level is below our default minimum
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
     static esp_err_t verbose(const std::string_view& msg,
                                 const source_location& location = source_location::current())
@@ -220,7 +222,7 @@ public:
     ///
     /// @param[in] level            : minimum log level for this instance
     constexpr Logging(const esp_log_level_t level) noexcept :
-        Logging{level, defalt_mutex_wait},
+        Logging{level, defalt_mutex_wait}
     {}
 
     /// @brief Construct a logging instance
@@ -232,7 +234,45 @@ public:
 
 private:
     static std::recursive_timed_mutex mutx; ///< API access mutex
+
+    struct FormatWithLocation 
+    {
+        std::string_view    format;
+        source_location     location;
+
+        FormatWithLocation(const std::string_view&& format,
+                            const source_location& location = source_location::current())
+            : format{format}, location{location}
+        {}
+    }; ///< Container to hold a string view and an optional source location
+
+    template <typename T>
+    static void args_to_stream(std::ostream& stream, const T arg)
+    {
+        constexpr static const char* delimiter{" "};
+        stream << arg << delimiter;
+    }
+
+    template<typename T, typename... Args>
+    static void args_to_stream(std::ostream& stream, const T arg, const Args... args)
+    {
+        args_to_stream(stream, arg);
+        args_to_stream(stream, args...);
+    }
+
+public:
+    template <typename... Args>
+    static esp_err_t vlog(const esp_log_level_t level, 
+                            const FormatWithLocation&& format, 
+                            const Args... args)
+    {
+        std::ostringstream stream;
+        args_to_stream(stream, args...);
+        return log(level, stream.str(), format.location);
+    }
 };
+
+inline std::recursive_timed_mutex Logging::mutx{}; ///< API access mutex
 
 } // namespace LOGGING
 

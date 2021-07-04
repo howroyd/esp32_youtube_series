@@ -53,7 +53,7 @@
     //],
     "cmake.configureOnOpen": true,
     "editor.fontSize": 12,
-    "idf.customExtraPaths": "/home/simon/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin:/home/simon/.espressif/tools/xtensa-esp32s2-elf/esp-2020r2-8.2.0/xtensa-esp32s2-elf/bin:/home/simon/.espressif/tools/esp32ulp-elf/2.28.51-esp-20191205/esp32ulp-elf-binutils/bin:/home/simon/.espressif/tools/esp32s2ulp-elf/2.28.51-esp-20191205/esp32s2ulp-elf-binutils/bin:/home/simon/.espressif/tools/openocd-esp32/v0.10.0-esp32-20191114/openocd-esp32/bin",
+    "idf.customExtraPaths": "/home/simon/.espressif/tools/xtensa-esp32-elf/esp-2020r3-8.4.0/xtensa-esp32-elf/bin:/home/simon/.espressif/tools/xtensa-esp32s2-elf/esp-2020r3-8.4.0/xtensa-esp32s2-elf/bin:/home/simon/.espressif/tools/xtensa-esp32s3-elf/esp-2020r3-8.4.0/xtensa-esp32s3-elf/bin:/home/simon/.espressif/tools/riscv32-esp-elf/1.24.0.123_64eb9ff-8.4.0/riscv32-esp-elf/bin:/home/simon/.espressif/tools/esp32ulp-elf/2.28.51-esp-20191205/esp32ulp-elf-binutils/bin:/home/simon/.espressif/tools/esp32s2ulp-elf/2.28.51-esp-20191205/esp32s2ulp-elf-binutils/bin:/home/simon/.espressif/tools/openocd-esp32/v0.10.0-esp32-20210401/openocd-esp32/bin",
     "idf.portWin": "COM6",
     "todo-tree.general.tags": [
         "BUG",
@@ -64,8 +64,8 @@
     ],
     "stm32-for-vscode.openOCDPath": false,
     "stm32-for-vscode.armToolchainPath": false,
-    "idf.espIdfPath": "/home/simon/esp-idf",
-    "idf.pythonBinPath": "/home/simon/.espressif/python_env/idf4.1_py3.7_env/bin/python",
-    "idf.customExtraVars": "{\"OPENOCD_SCRIPTS\":\"/home/simon/.espressif/tools/openocd-esp32/v0.10.0-esp32-20191114/openocd-esp32/share/openocd/scripts\"}",
+    "idf.espIdfPath": "/home/simon/esp/esp-idf",
+    "idf.pythonBinPath": "/home/simon/.espressif/python_env/idf4.3_py3.7_env/bin/python",
+    "idf.customExtraVars": "{\"OPENOCD_SCRIPTS\":\"/home/simon/.espressif/tools/openocd-esp32/v0.10.0-esp32-20210401/openocd-esp32/share/openocd/scripts\"}",
     "window.zoomLevel": 0.1
 }

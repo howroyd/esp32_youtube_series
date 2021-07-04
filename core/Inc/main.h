@@ -11,6 +11,7 @@
 #include "Wifi.h"
 #include "SntpTime.h"
 #include "Logging.h"
+
 class Main final
 {
 public:
