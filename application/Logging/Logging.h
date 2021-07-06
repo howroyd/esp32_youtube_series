@@ -235,6 +235,11 @@ public:
 private:
     static std::recursive_timed_mutex mutx; ///< API access mutex
 
+
+private:
+    //////////////
+    // New work //
+    //////////////
     struct FormatWithLocation 
     {
         std::string_view    format;
@@ -262,7 +267,17 @@ private:
 
 public:
     template <typename... Args>
-    static esp_err_t vlog(const esp_log_level_t level, 
+    static esp_err_t logf(const esp_log_level_t level, 
+                            const FormatWithLocation&& format, 
+                            const Args... args)
+    {
+        char buf[1024]{};
+        snprintf(buf, sizeof(buf), format.format.data(), args...);
+        return log(level, buf, format.location);
+    }
+
+    template <typename... Args>
+    static esp_err_t log(const esp_log_level_t level, 
                             const FormatWithLocation&& format, 
                             const Args... args)
     {
