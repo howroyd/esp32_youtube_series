@@ -51,8 +51,8 @@ extern "C" void app_main(void)
     ESP_LOGI(LOG_TAG, "Initialising NVS");
     ESP_ERROR_CHECK(nvs_flash_init());
 
-    LOG.logf(ESP_LOG_INFO, {"%d %s %s"}, 42, "hello", "world");
-    LOG.log(ESP_LOG_INFO, {"unused"}, 42, "hello", "world");
+    LOG.logf(ESP_LOG_INFO, "%d %s %s", 42, "hello", "world");
+    LOG.log(ESP_LOG_INFO, 42, "hello", "world");
 
     std::thread count_up(foo, false);
     std::thread count_down(foo, true);

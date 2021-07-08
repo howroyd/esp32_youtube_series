@@ -8,6 +8,7 @@
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 namespace LOGGING
@@ -21,6 +22,39 @@ class Logging
 
     constexpr static esp_log_level_t    default_level{ESP_LOG_INFO};    ///< Default logging level if none set
     constexpr static Ms                 defalt_mutex_wait{100};         ///< Default log timeout if none set
+
+    constexpr static size_t logf_buf_len{1024};                         ///< snprintf logbuf length
+
+    /// @brief Helper class for compile time argument parsing 
+    template<typename... Args>
+    class GetLast
+    {
+        template<typename T>
+        struct tag
+        {
+            using type = T;
+        }; ///< Extract the type of an argument as a thing with a name
+
+        /// @brief Return an argument
+        /// @note Required for the variadic template below to work
+        template <typename T>
+        constexpr T last_value(T val) { return val; }
+
+        /// @brief Return the last argument of a pack
+        template <typename T, typename... Ts>
+        constexpr auto last_value(T val, Ts... vals) { return last_value(vals...); }
+
+    public:
+        // Use a fold-expression to fold the comma operator over the parameter pack.
+        using type = typename decltype((tag<Args>{}, ...))::type;
+        
+        type value; ///< The value of the last argument in the pack
+
+        /// @brief Constructor
+        ///
+        /// @param[in] args : (variadic) arguement pack
+        constexpr GetLast(Args... args) : value{last_value(args...)} {}
+    };
 
 public:
     /// @brief Log a message at a given level
@@ -56,6 +90,85 @@ public:
 
     /// @brief Log a message at a given level
     ///
+    /// Will only log if above the default logging level
+    /// Times out if the log is busy
+    ///
+    /// @param[in] level : level to log this message at
+    /// @param[in] args  : (variadic) args to be passed to the std::stringstream
+    ///
+	/// @return 
+	/// 	- ESP_OK if message logged
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
+    ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
+    template <typename... Args>
+    static esp_err_t log(const esp_log_level_t level, 
+                            const Args... args)
+    {
+        std::ostringstream stream;
+        args_to_stream(stream, args...);
+        return log(level, stream.str());
+    }
+
+    /// @brief Log a printf style message at a given level
+    ///
+    /// Will only log if above the default logging level
+    /// Times out if the log is busy
+    ///
+    /// @note This is the version when source_location is the last arg
+    ///
+    /// @param[in] level  : level to log this message at
+    /// @param[in] format : printf format cstring
+    /// @param[in] args   : (variadic) args to be passed to the std::stringstream.  Last arg can be a source location
+    ///
+	/// @return 
+	/// 	- ESP_OK if message logged
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
+    ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
+    template <typename... Args,
+                std::enable_if_t<
+                    std::is_same_v<
+                        typename GetLast<Args...>::type, 
+                        source_location>,
+                    bool> = true
+            >
+    static esp_err_t logf(const esp_log_level_t level, const char* format, const Args... args)
+    {
+        char buf[logf_buf_len]{};
+        snprintf(buf, sizeof(buf), format, args...); // FIXME this forwards the sourcelocation arg which will fail
+        return log(level, buf, GetLast(args...).value);
+    }
+
+    /// @brief Log a printf style message at a given level
+    ///
+    /// Will only log if above the default logging level
+    /// Times out if the log is busy
+    ///
+    /// @note This is the version when source_location is not included as the last arg
+    ///
+    /// @param[in] level  : level to log this message at
+    /// @param[in] format : printf format cstring
+    /// @param[in] args   : (variadic) args to be passed to the std::stringstream.  Last arg can be a source location
+    ///
+	/// @return 
+	/// 	- ESP_OK if message logged
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
+    ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
+    template <typename... Args,
+                std::enable_if_t<
+                    !std::is_same_v<
+                        typename GetLast<Args...>::type, 
+                        source_location>,
+                    bool> = true
+            >
+    static esp_err_t logf(const esp_log_level_t level, const char* format, const Args... args)
+    {
+        char buf[logf_buf_len]{};
+        snprintf(buf, sizeof(buf), format, args...);
+        return log(level, buf);
+    }
+
+    /// @brief Log a message at a given level
+    ///
     /// @note Operator overload so we can just call the class name as a function
     ///
     /// Will only log if above the default logging level
@@ -76,6 +189,27 @@ public:
         return log(level, msg, location);
     }
 
+    /// @brief Log a message at a given level
+    ///
+    /// @note Operator overload so we can just call the class name as a function
+    ///
+    /// Will only log if above the default logging level
+    /// Times out if the log is busy
+    ///
+    /// @param[in] level : level to log this message at
+    /// @param[in] args  : (variadic) args to be passed to the std::stringstream.  Last arg can be a source location
+    ///
+	/// @return 
+	/// 	- ESP_OK if message logged
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
+    ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
+    template <typename... Args>
+    esp_err_t operator() (const esp_log_level_t level, 
+                            const Args... args)
+    {
+        return log(level, args...);
+    }
+
     /// @brief Log an error message (red)
     ///
     /// Times out if the log is busy
@@ -90,6 +224,41 @@ public:
                             const source_location& location = source_location::current())
     {
         return log(ESP_LOG_ERROR, msg, location);
+    }
+
+    /// @brief Log an error message (red)
+    ///
+    /// Times out if the log is busy
+    ///
+    /// @param[in] args  : (variadic) args to be passed to the std::stringstream.  Last arg can be a source location
+    ///
+	/// @return 
+	/// 	- ESP_OK if message logged
+    ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
+    template <typename... Args>
+    static esp_err_t error(const Args... args)
+    {
+        return log(ESP_LOG_ERROR, args...);
+    }
+
+    /// @brief Log a printf style error message (red)
+    ///
+    /// Will only log if above the default logging level
+    /// Times out if the log is busy
+    ///
+    /// @note This is the version when source_location is not included as the last arg
+    ///
+    /// @param[in] format : printf format cstring
+    /// @param[in] args   : (variadic) args to be passed to the std::stringstream.  Last arg can be a source location
+    ///
+	/// @return 
+	/// 	- ESP_OK if message logged
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
+    ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
+    template <typename... Args>
+    static esp_err_t errorf(const char* format, const Args... args)
+    {
+        return logf(ESP_LOG_ERROR, format, args...);
     }
 
     /// @brief Log a warning message (yellow)
@@ -110,6 +279,41 @@ public:
         return log(ESP_LOG_WARN, msg, location);
     }
 
+    /// @brief Log a warning message (yellow)
+    ///
+    /// Times out if the log is busy
+    ///
+    /// @param[in] args  : (variadic) args to be passed to the std::stringstream.  Last arg can be a source location
+    ///
+	/// @return 
+	/// 	- ESP_OK if message logged
+    ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
+    template <typename... Args>
+    static esp_err_t warning(const Args... args)
+    {
+        return log(ESP_LOG_WARN, args...);
+    }
+
+    /// @brief Log a printf style warning message (yellow)
+    ///
+    /// Will only log if above the default logging level
+    /// Times out if the log is busy
+    ///
+    /// @note This is the version when source_location is not included as the last arg
+    ///
+    /// @param[in] format : printf format cstring
+    /// @param[in] args   : (variadic) args to be passed to the std::stringstream.  Last arg can be a source location
+    ///
+	/// @return 
+	/// 	- ESP_OK if message logged
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
+    ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
+    template <typename... Args>
+    static esp_err_t warningf(const char* format, const Args... args)
+    {
+        return logf(ESP_LOG_WARN, format, args...);
+    }
+
     /// @brief Log an information message (green)
     ///
     /// Will only log if above the default logging level
@@ -126,6 +330,41 @@ public:
                             const source_location& location = source_location::current())
     {
         return log(ESP_LOG_INFO, msg, location);
+    }
+
+    /// @brief Log an information message (green)
+    ///
+    /// Times out if the log is busy
+    ///
+    /// @param[in] args  : (variadic) args to be passed to the std::stringstream.  Last arg can be a source location
+    ///
+	/// @return 
+	/// 	- ESP_OK if message logged
+    ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
+    template <typename... Args>
+    static esp_err_t info(const Args... args)
+    {
+        return log(ESP_LOG_INFO, args...);
+    }
+
+    /// @brief Log a printf style information message (green)
+    ///
+    /// Will only log if above the default logging level
+    /// Times out if the log is busy
+    ///
+    /// @note This is the version when source_location is not included as the last arg
+    ///
+    /// @param[in] format : printf format cstring
+    /// @param[in] args   : (variadic) args to be passed to the std::stringstream.  Last arg can be a source location
+    ///
+	/// @return 
+	/// 	- ESP_OK if message logged
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
+    ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
+    template <typename... Args>
+    static esp_err_t infof(const char* format, const Args... args)
+    {
+        return logf(ESP_LOG_INFO, format, args...);
     }
 
     /// @brief Log a debug message (white)
@@ -146,6 +385,41 @@ public:
         return log(ESP_LOG_DEBUG, msg, location);
     }
 
+    /// @brief Log a debug message (white)
+    ///
+    /// Times out if the log is busy
+    ///
+    /// @param[in] args  : (variadic) args to be passed to the std::stringstream.  Last arg can be a source location
+    ///
+	/// @return 
+	/// 	- ESP_OK if message logged
+    ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
+    template <typename... Args>
+    static esp_err_t debug(const Args... args)
+    {
+        return log(ESP_LOG_DEBUG, args...);
+    }
+
+    /// @brief Log a printf style debug message (white)
+    ///
+    /// Will only log if above the default logging level
+    /// Times out if the log is busy
+    ///
+    /// @note This is the version when source_location is not included as the last arg
+    ///
+    /// @param[in] format : printf format cstring
+    /// @param[in] args   : (variadic) args to be passed to the std::stringstream.  Last arg can be a source location
+    ///
+	/// @return 
+	/// 	- ESP_OK if message logged
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
+    ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
+    template <typename... Args>
+    static esp_err_t debugf(const char* format, const Args... args)
+    {
+        return logf(ESP_LOG_DEBUG, format, args...);
+    }
+
     /// @brief Log a verbose message
     ///
     /// Will only log if above the default logging level
@@ -164,6 +438,42 @@ public:
         return log(ESP_LOG_VERBOSE, msg, location);
     }
 
+    /// @brief Log a verbose message
+    ///
+    /// Times out if the log is busy
+    ///
+    /// @param[in] args  : (variadic) args to be passed to the std::stringstream.  Last arg can be a source location
+    ///
+	/// @return 
+	/// 	- ESP_OK if message logged
+    ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
+    template <typename... Args>
+    static esp_err_t verbose(const Args... args)
+    {
+        return log(ESP_LOG_VERBOSE, args...);
+    }
+
+    /// @brief Log a printf style verbose message
+    ///
+    /// Will only log if above the default logging level
+    /// Times out if the log is busy
+    ///
+    /// @note This is the version when source_location is not included as the last arg
+    ///
+    /// @param[in] format : printf format cstring
+    /// @param[in] args   : (variadic) args to be passed to the std::stringstream.  Last arg can be a source location
+    ///
+	/// @return 
+	/// 	- ESP_OK if message logged
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
+    ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
+    template <typename... Args>
+    static esp_err_t verbosef(const char* format, const Args... args)
+    {
+        return logf(ESP_LOG_VERBOSE, format, args...);
+    }
+
+public:
     /// @brief Aquire the logging lock
     ///
     /// Used to block all other threads from logging
@@ -237,20 +547,10 @@ private:
 
 
 private:
-    //////////////
-    // New work //
-    //////////////
-    struct FormatWithLocation 
-    {
-        std::string_view    format;
-        source_location     location;
-
-        FormatWithLocation(const std::string_view&& format,
-                            const source_location& location = source_location::current())
-            : format{format}, location{location}
-        {}
-    }; ///< Container to hold a string view and an optional source location
-
+    /// @brief Append an argument to a output stream
+    ///
+    /// @param[in,out] stream : std::ostream to append the argument to
+    /// @param[in] arg        : argument to append to the ostream
     template <typename T>
     static void args_to_stream(std::ostream& stream, const T arg)
     {
@@ -258,6 +558,10 @@ private:
         stream << arg << delimiter;
     }
 
+    /// @brief Append multiple arguments to a output stream
+    ///
+    /// @param[in,out] stream : std::ostream to append the argument to
+    /// @param[in] arg        : (variadic) arguments to append to the ostream
     template<typename T, typename... Args>
     static void args_to_stream(std::ostream& stream, const T arg, const Args... args)
     {
@@ -265,26 +569,6 @@ private:
         args_to_stream(stream, args...);
     }
 
-public:
-    template <typename... Args>
-    static esp_err_t logf(const esp_log_level_t level, 
-                            const FormatWithLocation&& format, 
-                            const Args... args)
-    {
-        char buf[1024]{};
-        snprintf(buf, sizeof(buf), format.format.data(), args...);
-        return log(level, buf, format.location);
-    }
-
-    template <typename... Args>
-    static esp_err_t log(const esp_log_level_t level, 
-                            const FormatWithLocation&& format, 
-                            const Args... args)
-    {
-        std::ostringstream stream;
-        args_to_stream(stream, args...);
-        return log(level, stream.str(), format.location);
-    }
 };
 
 inline std::recursive_timed_mutex Logging::mutx{}; ///< API access mutex
