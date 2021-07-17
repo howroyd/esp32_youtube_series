@@ -182,6 +182,76 @@ public:
         return log(level, buf);
     }
 
+    /// @brief Log a buffer of hex bytes at specified level, separated into 16 bytes each line.
+    ///
+    /// Will only log if above the default logging level
+    /// Times out if the log is busy
+    ///
+    /// @param[in] level    : level to log this message at
+    /// @param[in] buf      : buffer to log
+    /// @param[in] buf_len  : buffer length in bytes
+    /// @param[in] location : (optional) source location where the log originates from
+    ///
+	/// @return 
+	/// 	- ESP_OK if message logged
+    /// 	- ESP_ERR_INVALID_ARG if buffer is nullptr or length is zero
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
+    ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
+    static esp_err_t hex(const esp_log_level_t level,
+                            const void* buf, const size_t buf_len,
+                            const source_location& location = source_location::current())
+    {
+        if (default_level < level) return ESP_ERR_INVALID_STATE;
+        
+        if (buf && 0 < buf_len)
+        {
+            if (mutx.try_lock_for(defalt_mutex_wait))
+            {
+                ESP_LOG_BUFFER_HEX_LEVEL(location.file_name(), 
+                                            buf, buf_len, level);
+                mutx.unlock();
+                return ESP_OK;
+            }
+            return ESP_ERR_TIMEOUT;
+        }
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    /// @brief Dump a buffer to the log at specified level
+    ///
+    /// Will only log if above the default logging level
+    /// Times out if the log is busy
+    ///
+    /// @param[in] level    : level to log this message at
+    /// @param[in] buf      : buffer to log
+    /// @param[in] buf_len  : buffer length in bytes
+    /// @param[in] location : (optional) source location where the log originates from
+    ///
+	/// @return 
+	/// 	- ESP_OK if message logged
+    /// 	- ESP_ERR_INVALID_ARG if buffer is nullptr or length is zero
+    ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
+    ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
+    static esp_err_t hexdump(const esp_log_level_t level,
+                                const void* buf, const size_t buf_len,
+                                const source_location& location = source_location::current())
+    {
+        if (default_level < level) return ESP_ERR_INVALID_STATE;
+        
+        if (buf && 0 < buf_len)
+        {
+            if (mutx.try_lock_for(defalt_mutex_wait))
+            {
+                ESP_LOG_BUFFER_HEXDUMP(location.file_name(), 
+                                            buf, buf_len, level);
+                mutx.unlock();
+                return ESP_OK;
+            }
+            return ESP_ERR_TIMEOUT;
+        }
+        return ESP_ERR_INVALID_ARG;
+    }
+
     /// @brief Log a message at a given level
     ///
     /// @note Operator overload so we can just call the class name as a function
