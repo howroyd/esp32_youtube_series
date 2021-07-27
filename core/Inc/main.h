@@ -22,6 +22,7 @@ public:
     void loop(void);
 
     Gpio::GpioOutput led{GPIO_NUM_27, true};
+    Gpio::GpioOutput arduled{"D6", true};
     WIFI::Wifi wifi;
     SNTP::Sntp& sntp;
 };
