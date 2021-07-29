@@ -2,26 +2,273 @@
 
 #include "driver/gpio.h"
 #include "driver/adc.h"
+#include "driver/dac.h"
 #include "esp_adc_cal.h"
 #include "esp_intr_alloc.h"
 
 #include <cassert>
+#include <cstdint>
 #include <cstring>
 #include <array>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 
 namespace Gpio
 {
 
+// https://www.az-delivery.de/en/blogs/azdelivery-blog-fur-arduino-und-raspberry-pi/das-24-und-letzte-turchen
+// https://www.electroschematics.com/arduino-uno-pinout/
+class PinMap
+{
+    using ArduinoPinMap_t = std::pair<const std::string_view, const gpio_num_t>;
+
+#if CONFIG_IDF_TARGET_ESP32
+    constexpr static std::array<ArduinoPinMap_t, 23> arduino_pins = 
+    {{
+        {"D0",  GPIO_NUM_3},
+        {"D1",  GPIO_NUM_1},
+        {"D2",  GPIO_NUM_26},
+        {"D3",  GPIO_NUM_25},
+        {"D4",  GPIO_NUM_17},
+        {"D5",  GPIO_NUM_16},
+        {"D6",  GPIO_NUM_27},
+        {"D7",  GPIO_NUM_14},
+        {"D8",  GPIO_NUM_12},
+        {"D9",  GPIO_NUM_13},
+        {"D10", GPIO_NUM_5},
+        {"D11", GPIO_NUM_23},
+        {"D12", GPIO_NUM_19},
+        {"D13", GPIO_NUM_18},
+        {"A0",  GPIO_NUM_39},
+        {"A1",  GPIO_NUM_36},
+        {"A2",  GPIO_NUM_34},
+        {"A3",  GPIO_NUM_35},
+        {"A4",  GPIO_NUM_4},
+        {"A5",  GPIO_NUM_2},
+        {"SDA", GPIO_NUM_21},
+        {"SCL", GPIO_NUM_22},
+        {"OD",  GPIO_NUM_0}
+    }};
+
+    constexpr static std::array<gpio_num_t, 8> adc1_pins = 
+    {{
+        GPIO_NUM_32,
+        GPIO_NUM_33,
+        GPIO_NUM_34,
+        GPIO_NUM_35,
+        GPIO_NUM_36,
+        GPIO_NUM_37,
+        GPIO_NUM_38,
+        GPIO_NUM_39
+    }};
+
+    constexpr static std::array<gpio_num_t, 6> adc2_pins = 
+    {{
+        //GPIO_NUM_0, // Strapping
+        //GPIO_NUM_2, // Strapping
+        //GPIO_NUM_4, // ESP-WROVER-KIT pin
+        GPIO_NUM_12,
+        GPIO_NUM_13,
+        GPIO_NUM_14,
+        //GPIO_NUM_15, // Strapping
+        GPIO_NUM_25,
+        GPIO_NUM_26,
+        GPIO_NUM_27
+    }};
+
+    constexpr static std::array<gpio_num_t, 38> interrupt_pins = 
+    {{
+        GPIO_NUM_0,
+        GPIO_NUM_1,
+        GPIO_NUM_2,
+        GPIO_NUM_3,
+        GPIO_NUM_4,
+        GPIO_NUM_5,
+        GPIO_NUM_6,
+        GPIO_NUM_7,
+        GPIO_NUM_8,
+        GPIO_NUM_9,
+        GPIO_NUM_10,
+        GPIO_NUM_11,
+        GPIO_NUM_12,
+        GPIO_NUM_13,
+        GPIO_NUM_14,
+        GPIO_NUM_15,
+        GPIO_NUM_16,
+        GPIO_NUM_17,
+        GPIO_NUM_18,
+        GPIO_NUM_19,
+        GPIO_NUM_20,
+        GPIO_NUM_21,
+        GPIO_NUM_22,
+        GPIO_NUM_23,
+        GPIO_NUM_25,
+        GPIO_NUM_26,
+        GPIO_NUM_27,
+        GPIO_NUM_28,
+        GPIO_NUM_29,
+        GPIO_NUM_30,
+        GPIO_NUM_31,
+        GPIO_NUM_32,
+        GPIO_NUM_33,
+        GPIO_NUM_34,
+        GPIO_NUM_35,
+        //GPIO_NUM_36, // Clash with WiFi
+        GPIO_NUM_37,
+        GPIO_NUM_38//,
+        //GPIO_NUM_39 // Clash with WiFi
+    }};
+
+    constexpr static std::array<gpio_num_t, 2> dac_pins = 
+    {{
+        GPIO_NUM_25,
+        GPIO_NUM_26
+    }};
+
+#else
+#error "This code is written for ESP32 only."
+#endif
+
+public:
+    [[nodiscard]] constexpr static gpio_num_t at(const std::string_view& arduino_pin_name) noexcept
+    {
+        for (const auto& iter : arduino_pins)
+            if (iter.first == arduino_pin_name) 
+                return iter.second;
+
+        return GPIO_NUM_NC;
+    }
+
+    [[nodiscard]] constexpr static bool is_pin(const gpio_num_t pin) noexcept
+    {
+        return (GPIO_NUM_NC < pin && GPIO_NUM_MAX > pin) && GPIO_IS_VALID_GPIO(pin); // TODO probably don't need both the macro and our search
+    }
+
+    [[nodiscard]] constexpr static bool is_pin(const std::string_view& arduino_pin_name) noexcept
+        { return is_pin(at(arduino_pin_name)); }
+
+    [[nodiscard]] constexpr static bool is_input(const gpio_num_t pin) noexcept
+        { return is_pin(pin); }
+
+    [[nodiscard]] constexpr static bool is_input(const std::string_view& arduino_pin_name) noexcept
+        { return is_input(at(arduino_pin_name)); }
+
+    [[nodiscard]] constexpr static bool is_output(const gpio_num_t pin) noexcept
+    {
+        return is_pin(pin) &&
+                (GPIO_NUM_NC < pin && GPIO_NUM_MAX > pin && 
+                    (GPIO_NUM_34 > pin || GPIO_NUM_39 < pin)) &&
+                        GPIO_IS_VALID_OUTPUT_GPIO(pin); // TODO probably don't need both the macro and our search
+    }
+
+    [[nodiscard]] constexpr static bool is_output(const std::string_view& arduino_pin_name) noexcept
+        { return is_output(at(arduino_pin_name)); }
+
+    [[nodiscard]] constexpr static bool is_input_and_output(const gpio_num_t pin) noexcept
+        { return is_input(pin) && is_output(pin); }
+
+    [[nodiscard]] constexpr static bool is_input_and_output(const std::string_view& arduino_pin_name) noexcept
+        { return is_input_and_output(at(arduino_pin_name)); }
+
+    [[nodiscard]] constexpr static bool is_input_only(const gpio_num_t pin) noexcept
+        { return is_input(pin) && !is_output(pin); }
+
+    [[nodiscard]] constexpr static bool is_input_only(const std::string_view& arduino_pin_name) noexcept
+        { return is_input_only(at(arduino_pin_name)); }
+
+    [[nodiscard]] constexpr static bool is_analogue(const gpio_num_t pin) noexcept
+    {
+        if (is_pin(pin))
+        {
+            for (const gpio_num_t avail : adc1_pins)
+                if (pin == avail) 
+                    return true;
+            for (const gpio_num_t avail : adc2_pins)
+                if (pin == avail) 
+                    return true;
+        }
+
+        return false;
+    }
+
+    [[nodiscard]] constexpr static bool is_analogue(const std::string_view& arduino_pin_name) noexcept
+        { return is_analogue(at(arduino_pin_name)); }
+
+    [[nodiscard]] constexpr static bool is_interrupt(const gpio_num_t pin) noexcept
+    {
+        if (is_pin(pin))
+            for (const gpio_num_t avail : interrupt_pins)
+                if (pin == avail) 
+                    return true;
+
+        return false;
+    }
+
+    [[nodiscard]] constexpr static bool is_interrupt(const std::string_view& arduino_pin_name) noexcept
+        { return is_interrupt(at(arduino_pin_name)); }
+
+    [[nodiscard]] constexpr static bool is_adc1(const gpio_num_t pin) noexcept
+    {
+        if (is_pin(pin))
+        {
+            for (const gpio_num_t avail : adc1_pins)
+                if (pin == avail) 
+                    return true;
+        }
+
+        return false;
+    }
+
+    [[nodiscard]] constexpr static bool is_adc1(const std::string_view& arduino_pin_name) noexcept
+        { return is_adc1(at(arduino_pin_name)); }
+
+    [[nodiscard]] constexpr static bool is_adc2(const gpio_num_t pin) noexcept
+    {
+        if (is_pin(pin))
+        {
+            for (const gpio_num_t avail : adc2_pins)
+                if (pin == avail) 
+                    return true;
+        }
+
+        return false;
+    }
+
+    [[nodiscard]] constexpr static bool is_adc2(const std::string_view& arduino_pin_name) noexcept
+        { return is_adc2(at(arduino_pin_name)); }
+
+    [[nodiscard]] constexpr static bool is_dac(const gpio_num_t pin) noexcept
+    {
+        if (is_pin(pin))
+        {
+            for (const gpio_num_t avail : dac_pins)
+                if (pin == avail) 
+                    return true;
+        }
+
+        return false;
+    }
+
+    [[nodiscard]] constexpr static bool is_dac(const std::string_view& arduino_pin_name) noexcept
+        { return is_dac(at(arduino_pin_name)); }
+
+    PinMap(void) = delete; // Not constructable, compile time only
+};
+
 class GpioBase
 {
 protected:
-    const gpio_num_t _pin;
-    const bool _inverted_logic = false;
+    const gpio_num_t    _pin;
+    const bool          _inverted_logic = false;
     const gpio_config_t _cfg;
 
 public:
+    constexpr static bool is_valid_pin(const gpio_num_t pin) noexcept
+        { return PinMap::is_pin(pin); }
+    constexpr static bool is_valid_pin(const std::string_view& arduino_pin_name) noexcept
+        { return is_valid_pin(PinMap::at(arduino_pin_name)); }
+
     constexpr GpioBase(const gpio_num_t pin,
                         const gpio_config_t& config, 
                         const bool invert_logic = false) noexcept :
@@ -35,272 +282,49 @@ public:
                         .intr_type      = config.intr_type
             }}
     {
-        assert(ArduinoPinMap::is_pin(pin));
+        assert(is_valid_pin(pin));
 
-        assert(!(ArduinoPinMap::is_input_only(pin) && 
+        assert(!(PinMap::is_input_only(pin) && 
                     (_cfg.pull_up_en == GPIO_PULLUP_ENABLE || _cfg.pull_up_en == GPIO_PULLUP_ENABLE)));
     }
 
     constexpr GpioBase(const std::string_view& arduino_pin_name,
                         const gpio_config_t& config, 
                         const bool invert_logic = false) noexcept :
-        GpioBase{ArduinoPinMap::at(arduino_pin_name), config, invert_logic}
+        GpioBase{PinMap::at(arduino_pin_name), config, invert_logic}
     {}
 
     ~GpioBase(void) noexcept
-    {
-        gpio_reset_pin(_pin);
-    }
+        { gpio_reset_pin(_pin); }
 
-    [[nodiscard]] virtual bool state(void) const =0;
+    [[nodiscard]] virtual bool                        state(void) const noexcept =0;
 
-    [[nodiscard]] operator bool() const { return state(); }
+    [[nodiscard]] operator bool() const noexcept
+        { return state(); }
     
-    [[nodiscard]] esp_err_t init(void)
-    {
-        return gpio_config(&_cfg);
-    }
+    [[nodiscard]] esp_err_t                           init(void) noexcept
+        { return gpio_config(&_cfg); }
 
-    // https://www.az-delivery.de/en/blogs/azdelivery-blog-fur-arduino-und-raspberry-pi/das-24-und-letzte-turchen
-    // https://www.electroschematics.com/arduino-uno-pinout/
-    class ArduinoPinMap
-    {
-        using ArduinoPinMap_t = std::pair<const std::string_view, const gpio_num_t>;
+    [[nodiscard]] constexpr const gpio_num_t&         pin(void) const noexcept
+        { return _pin; }
 
-#if CONFIG_IDF_TARGET_ESP32
-        constexpr static std::array<ArduinoPinMap_t, 23> arduino_pins = 
-        {{
-            {"D0",  GPIO_NUM_3},
-            {"D1",  GPIO_NUM_1},
-            {"D2",  GPIO_NUM_26},
-            {"D3",  GPIO_NUM_25},
-            {"D4",  GPIO_NUM_17},
-            {"D5",  GPIO_NUM_16},
-            {"D6",  GPIO_NUM_27},
-            {"D7",  GPIO_NUM_14},
-            {"D8",  GPIO_NUM_12},
-            {"D9",  GPIO_NUM_13},
-            {"D10", GPIO_NUM_5},
-            {"D11", GPIO_NUM_23},
-            {"D12", GPIO_NUM_19},
-            {"D13", GPIO_NUM_18},
-            {"A0",  GPIO_NUM_39},
-            {"A1",  GPIO_NUM_36},
-            {"A2",  GPIO_NUM_34},
-            {"A3",  GPIO_NUM_35},
-            {"A4",  GPIO_NUM_4},
-            {"A5",  GPIO_NUM_2},
-            {"SDA", GPIO_NUM_21},
-            {"SCL", GPIO_NUM_22},
-            {"OD",  GPIO_NUM_0}
-        }};
+    [[nodiscard]] constexpr const bool&               inverted_logic(void) const noexcept
+        { return _inverted_logic; }
 
-        constexpr static std::array<gpio_num_t, 8> adc1_pins = 
-        {{
-            GPIO_NUM_32,
-            GPIO_NUM_33,
-            GPIO_NUM_34,
-            GPIO_NUM_35,
-            GPIO_NUM_36,
-            GPIO_NUM_37,
-            GPIO_NUM_38,
-            GPIO_NUM_39
-        }};
+    [[nodiscard]] constexpr const uint64_t&           cfg_pin_bit_mask(void) const noexcept
+        { return _cfg.pin_bit_mask; }
 
-        constexpr static std::array<gpio_num_t, 6> adc2_pins = 
-        {{
-            //GPIO_NUM_0, // Strapping
-            //GPIO_NUM_2, // Strapping
-            //GPIO_NUM_4, // ESP-WROVER-KIT pin
-            GPIO_NUM_12,
-            GPIO_NUM_13,
-            GPIO_NUM_14,
-            //GPIO_NUM_15, // Strapping
-            GPIO_NUM_25,
-            GPIO_NUM_26,
-            GPIO_NUM_27
-        }};
+    [[nodiscard]] constexpr const gpio_mode_t&        cfg_mode(void) const noexcept
+        { return _cfg.mode; }
 
-        constexpr static std::array<gpio_num_t, 38> interrupt_pins = 
-        {{
-            GPIO_NUM_0,
-            GPIO_NUM_1,
-            GPIO_NUM_2,
-            GPIO_NUM_3,
-            GPIO_NUM_4,
-            GPIO_NUM_5,
-            GPIO_NUM_6,
-            GPIO_NUM_7,
-            GPIO_NUM_8,
-            GPIO_NUM_9,
-            GPIO_NUM_10,
-            GPIO_NUM_11,
-            GPIO_NUM_12,
-            GPIO_NUM_13,
-            GPIO_NUM_14,
-            GPIO_NUM_15,
-            GPIO_NUM_16,
-            GPIO_NUM_17,
-            GPIO_NUM_18,
-            GPIO_NUM_19,
-            GPIO_NUM_20,
-            GPIO_NUM_21,
-            GPIO_NUM_22,
-            GPIO_NUM_23,
-            GPIO_NUM_25,
-            GPIO_NUM_26,
-            GPIO_NUM_27,
-            GPIO_NUM_28,
-            GPIO_NUM_29,
-            GPIO_NUM_30,
-            GPIO_NUM_31,
-            GPIO_NUM_32,
-            GPIO_NUM_33,
-            GPIO_NUM_34,
-            GPIO_NUM_35,
-            //GPIO_NUM_36, // Clash with WiFi
-            GPIO_NUM_37,
-            GPIO_NUM_38//,
-            //GPIO_NUM_39 // Clash with WiFi
-        }};
-#else
-#error "This code is written for ESP32 only."
-#endif
+    [[nodiscard]] constexpr const gpio_pullup_t&      cfg_pull_up_en(void) const noexcept
+        { return _cfg.pull_up_en; }
 
-    public:
-        constexpr static gpio_num_t at(const std::string_view& arduino_pin_name) noexcept
-        {
-            for (const auto& iter : arduino_pins)
-                if (iter.first == arduino_pin_name) 
-                    return iter.second;
+    [[nodiscard]] constexpr const gpio_pulldown_t&    cfg_pull_down_en(void) const noexcept
+        { return _cfg.pull_down_en; }
 
-            return GPIO_NUM_NC;
-        }
-
-        constexpr static bool is_pin(const gpio_num_t pin) noexcept
-        {
-            return (GPIO_NUM_NC < pin && GPIO_NUM_MAX > pin) && GPIO_IS_VALID_GPIO(pin); // TODO probably don't need both the macro and our search
-        }
-
-        constexpr static bool is_pin(const std::string_view& arduino_pin_name) noexcept
-        {
-            return is_pin(at(arduino_pin_name));
-        }
-
-        constexpr static bool is_input(const gpio_num_t pin) noexcept
-        {
-            return is_pin(pin);
-        }
-
-        constexpr static bool is_input(const std::string_view& arduino_pin_name) noexcept
-        {
-            return is_input(at(arduino_pin_name));
-        }
-
-        constexpr static bool is_output(const gpio_num_t pin) noexcept
-        {
-            return is_pin(pin) &&
-                    (GPIO_NUM_NC < pin && GPIO_NUM_MAX > pin && (GPIO_NUM_34 > pin || GPIO_NUM_39 < pin)) &&
-                    GPIO_IS_VALID_OUTPUT_GPIO(pin); // TODO probably don't need both the macro and our search
-        }
-
-        constexpr static bool is_output(const std::string_view& arduino_pin_name) noexcept
-        {
-            return is_output(at(arduino_pin_name));
-        }
-
-        constexpr static bool is_input_and_output(const gpio_num_t pin) noexcept
-        {
-            return is_input(pin) && is_output(pin);
-        }
-
-        constexpr static bool is_input_and_output(const std::string_view& arduino_pin_name) noexcept
-        {
-            return is_input_and_output(at(arduino_pin_name));
-        }
-
-        constexpr static bool is_input_only(const gpio_num_t pin) noexcept
-        {
-            return is_input(pin) && !is_output(pin);
-        }
-
-        constexpr static bool is_input_only(const std::string_view& arduino_pin_name) noexcept
-        {
-            return is_input_only(at(arduino_pin_name));
-        }
-
-        constexpr static bool is_analogue(const gpio_num_t pin) noexcept
-        {
-            if (is_pin(pin))
-            {
-                for (const gpio_num_t avail : adc1_pins)
-                    if (pin == avail) 
-                        return true;
-                for (const gpio_num_t avail : adc2_pins)
-                    if (pin == avail) 
-                        return true;
-            }
-
-            return false;
-        }
-
-        constexpr static bool is_analogue(const std::string_view& arduino_pin_name) noexcept
-        {
-            return is_analogue(at(arduino_pin_name));
-        }
-
-        constexpr static bool is_interrupt(const gpio_num_t pin) noexcept
-        {
-            if (is_pin(pin))
-                for (const gpio_num_t avail : interrupt_pins)
-                    if (pin == avail) 
-                        return true;
-
-            return false;
-        }
-
-        constexpr static bool is_interrupt(const std::string_view& arduino_pin_name) noexcept
-        {
-            return is_interrupt(at(arduino_pin_name));
-        }
-
-        constexpr static bool is_adc1(const gpio_num_t pin) noexcept
-        {
-            if (is_pin(pin))
-            {
-                for (const gpio_num_t avail : adc1_pins)
-                    if (pin == avail) 
-                        return true;
-            }
-
-            return false;
-        }
-
-        constexpr static bool is_adc1(const std::string_view& arduino_pin_name) noexcept
-        {
-            return is_adc1(at(arduino_pin_name));
-        }
-
-        constexpr static bool is_adc2(const gpio_num_t pin) noexcept
-        {
-            if (is_pin(pin))
-            {
-                for (const gpio_num_t avail : adc2_pins)
-                    if (pin == avail) 
-                        return true;
-            }
-
-            return false;
-        }
-
-        constexpr static bool is_adc2(const std::string_view& arduino_pin_name) noexcept
-        {
-            return is_adc2(at(arduino_pin_name));
-        }
-
-        ArduinoPinMap(void) = delete; // Not constructable, compile time only
-    };    
-
+    [[nodiscard]] constexpr const gpio_int_type_t&    cfg_intr_type(void) const noexcept
+        { return _cfg.intr_type; }
 }; // GpioBase
 
 class GpioOutput : public GpioBase
@@ -312,15 +336,20 @@ protected:
                             const gpio_config_t& cfg, 
                             const bool invert) noexcept :
         GpioBase{pin, cfg, invert}
-    { assert(ArduinoPinMap::is_output(pin)); }
+    { assert(is_valid_pin(pin)); }
 
     constexpr GpioOutput(const std::string_view& arduino_pin_name, 
                             const gpio_config_t& cfg, 
                             const bool invert) noexcept :
-        GpioOutput{ArduinoPinMap::at(arduino_pin_name), cfg, invert}
+        GpioOutput{PinMap::at(arduino_pin_name), cfg, invert}
     {}
 
 public:
+    constexpr static bool is_valid_pin(const gpio_num_t pin) noexcept
+        { return GpioBase::is_valid_pin(pin) && PinMap::is_output(pin); }
+    constexpr static bool is_valid_pin(const std::string_view& arduino_pin_name) noexcept
+        { return is_valid_pin(PinMap::at(arduino_pin_name)); }
+
     constexpr GpioOutput(const gpio_num_t pin, const bool invert = false) noexcept :
         GpioOutput{pin, 
                     gpio_config_t{
@@ -334,17 +363,17 @@ public:
     {}
 
     constexpr GpioOutput(const std::string_view& arduino_pin_name, const bool invert = false) noexcept :
-        GpioOutput{ArduinoPinMap::at(arduino_pin_name), invert}
+        GpioOutput{PinMap::at(arduino_pin_name), invert}
     {}
 
-    [[nodiscard]] esp_err_t init(void)
+    [[nodiscard]] esp_err_t init(void) noexcept
     {
         esp_err_t status = GpioBase::init();
         if (ESP_OK == status) status |= set(false);
         return status;
     }
 
-    esp_err_t set(const bool state)
+    esp_err_t set(const bool state) noexcept
     {
         const bool      state_to_set = _inverted_logic ? !state : state;
         const esp_err_t status       = gpio_set_level(_pin, state_to_set);
@@ -353,7 +382,7 @@ public:
         return status;
     }
 
-    [[nodiscard]] bool state(void) const 
+    [[nodiscard]] bool state(void) const noexcept 
         { return _inverted_logic ? !_state : _state; }
 };
 
@@ -364,15 +393,20 @@ protected:
                         const gpio_config_t& cfg, 
                         const bool invert = false) noexcept :
         GpioBase{pin, cfg, invert}
-    { assert(ArduinoPinMap::is_input(pin)); }
+    { assert(is_valid_pin(pin)); }
 
     constexpr GpioInput(const std::string_view& arduino_pin_name, 
                         const gpio_config_t& cfg, 
                         const bool invert = false) noexcept :
-        GpioInput{ArduinoPinMap::at(arduino_pin_name), cfg, invert}
+        GpioInput{PinMap::at(arduino_pin_name), cfg, invert}
     {}
 
 public:
+    constexpr static bool is_valid_pin(const gpio_num_t pin) noexcept
+        { return GpioBase::is_valid_pin(pin) && PinMap::is_input(pin); }
+    constexpr static bool is_valid_pin(const std::string_view& arduino_pin_name) noexcept
+        { return is_valid_pin(PinMap::at(arduino_pin_name)); }
+
     constexpr GpioInput(const gpio_num_t pin, const bool invert = false) noexcept :
         GpioInput{pin, 
                     gpio_config_t{
@@ -387,25 +421,30 @@ public:
 
     constexpr GpioInput(const std::string_view& arduino_pin_name, 
                         const bool invert = false) noexcept :
-        GpioInput{ArduinoPinMap::at(arduino_pin_name), invert}
+        GpioInput{PinMap::at(arduino_pin_name), invert}
     {}
 
-    [[nodiscard]] bool get(void) const
+    [[nodiscard]] bool get(void) const noexcept
     {
         const bool pin_state = gpio_get_level(_pin) == 0 ? false : true;
         return _inverted_logic ? !pin_state : pin_state;
     }
 
-    [[nodiscard]] bool state(void) const 
+    [[nodiscard]] bool state(void) const noexcept
         { return get(); }
 };
 
-class GpioInterrupt : public GpioInput
+class GpioInterrupt final : public GpioInput
 {
     constexpr static esp_err_t isr_service_state_default{ESP_ERR_INVALID_STATE};
     static esp_err_t isr_service_state;
 
 public:
+    constexpr static bool is_valid_pin(const gpio_num_t pin) noexcept
+        { return GpioInput::is_valid_pin(pin) && PinMap::is_interrupt(pin); }
+    constexpr static bool is_valid_pin(const std::string_view& arduino_pin_name) noexcept
+        { return is_valid_pin(PinMap::at(arduino_pin_name)); }
+
     constexpr GpioInterrupt(const gpio_num_t pin, 
                             const gpio_int_type_t interrupt_type) noexcept :
         GpioInput{pin, 
@@ -416,11 +455,11 @@ public:
                         .pull_down_en   = GPIO_PULLDOWN_DISABLE,
                         .intr_type      = interrupt_type
                     }}
-    { assert(ArduinoPinMap::is_interrupt(pin)); }
+    { assert(is_valid_pin(pin)); }
 
     constexpr GpioInterrupt(const std::string_view& arduino_pin_name, 
                             const gpio_int_type_t interrupt_type) noexcept :
-        GpioInterrupt{ArduinoPinMap::at(arduino_pin_name), interrupt_type}
+        GpioInterrupt{PinMap::at(arduino_pin_name), interrupt_type}
     {}
 
     ~GpioInterrupt(void) noexcept
@@ -429,7 +468,7 @@ public:
         gpio_isr_handler_remove(_pin);
     }
 
-    [[nodiscard]] esp_err_t init(gpio_isr_t isr_callback)
+    [[nodiscard]] esp_err_t init(gpio_isr_t isr_callback) noexcept
     {
         esp_err_t status = GpioInput::init();
 
@@ -455,34 +494,39 @@ public:
 
 inline esp_err_t GpioInterrupt::isr_service_state{isr_service_state_default};
 
-class GpioAnalogueInput : public GpioInput
+class AnalogueInput final : public GpioInput
 {
     constexpr static adc_bits_width_t  width_default{ADC_WIDTH_BIT_12};
     constexpr static adc_atten_t       atten_default{ADC_ATTEN_DB_0};
     constexpr static uint32_t          n_samples_default{10};
-    static bool two_point_supported, vref_supported;
+    static           bool              _two_point_supported, _vref_supported;
 
-    enum class Adc_num_t
+    enum class Adc_num_t : int
     {
-        ADC_1,
-        ADC_2,
-        ADC_MAX
-    } const adc_num{Adc_num_t::ADC_MAX};
+        ADC_1 = 1,
+        ADC_2 = 2,
+        ADC_MAX = -1
+    } const _adc_num{Adc_num_t::ADC_MAX};
 
-    /*const*/ adc_channel_t     channel;
-    /*const*/ adc_bits_width_t  width{width_default};
-    /*const*/ adc_atten_t       atten{atten_default};
-    /*const*/ adc_unit_t        unit{ADC_UNIT_1}; // ESP32 only supports unit 1
+    /*const*/ adc_channel_t     _channel;
+    /*const*/ adc_bits_width_t  _width{width_default};
+    /*const*/ adc_atten_t       _atten{atten_default};
+    /*const*/ adc_unit_t        _unit{ADC_UNIT_1}; // ESP32 only supports unit 1
 
-    /*const*/ adc1_channel_t    adc1_channel; // TODO std::variant instead???
-    /*const*/ adc2_channel_t    adc2_channel; // TODO std::variant instead???
+    /*const*/ adc1_channel_t    _adc1_channel; // TODO std::variant instead???
+    /*const*/ adc2_channel_t    _adc2_channel; // TODO std::variant instead???
 
-    esp_adc_cal_characteristics_t adc_chars{};
+    esp_adc_cal_characteristics_t _adc_chars{};
 
-    uint32_t vref{1100};
+    uint32_t _vref{1100};
 
 public:
-    constexpr GpioAnalogueInput(const gpio_num_t pin,
+    constexpr static bool is_valid_pin(const gpio_num_t pin) noexcept
+        { return GpioInput::is_valid_pin(pin) && PinMap::is_analogue(pin); }
+    constexpr static bool is_valid_pin(const std::string_view& arduino_pin_name) noexcept
+        { return is_valid_pin(PinMap::at(arduino_pin_name)); }
+
+    constexpr AnalogueInput(const gpio_num_t pin,
                                 const adc_bits_width_t width,
                                 const adc_atten_t attenuation) noexcept :
         GpioInput{pin, 
@@ -493,69 +537,69 @@ public:
                         .pull_down_en   = GPIO_PULLDOWN_DISABLE,
                         .intr_type      = GPIO_INTR_DISABLE
                     }},
-        adc_num{pin_to_adc_num(pin)},
-        channel{pin_to_adc_channel(pin)},
-        width{width},
-        atten{attenuation},
-        adc1_channel{pin_to_adc1_channel(pin)},
-        adc2_channel{pin_to_adc2_channel(pin)}
+        _adc_num{pin_to_adc_num(pin)},
+        _channel{pin_to_adc_channel(pin)},
+        _width{width},
+        _atten{attenuation},
+        _adc1_channel{pin_to_adc1_channel(pin)},
+        _adc2_channel{pin_to_adc2_channel(pin)}
     { 
-        assert(ArduinoPinMap::is_analogue(pin));
-        assert(Adc_num_t::ADC_MAX != adc_num);
-        assert(ADC_CHANNEL_MAX > channel);
-        assert(ADC_WIDTH_MAX > width);
-        assert(ADC_ATTEN_MAX > atten);
-        switch (adc_num)
+        assert(is_valid_pin(pin));
+        assert(Adc_num_t::ADC_MAX != _adc_num);
+        assert(ADC_CHANNEL_MAX > _channel);
+        assert(ADC_WIDTH_MAX > _width);
+        assert(ADC_ATTEN_MAX > _atten);
+        switch (_adc_num)
         {
         case Adc_num_t::ADC_1:
-            assert(ADC1_CHANNEL_MAX > adc1_channel);
+            assert(ADC1_CHANNEL_MAX > _adc1_channel);
             break;
         case Adc_num_t::ADC_2:
-            assert(ADC2_CHANNEL_MAX > adc2_channel);
+            assert(ADC2_CHANNEL_MAX > _adc2_channel);
             break;
         default:
             assert(false);
         };
     }
 
-    constexpr GpioAnalogueInput(const gpio_num_t pin) noexcept :
-        GpioAnalogueInput{pin, width_default, atten_default}
+    constexpr AnalogueInput(const gpio_num_t pin) noexcept :
+        AnalogueInput{pin, width_default, atten_default}
     {}
 
-    explicit constexpr GpioAnalogueInput(const gpio_num_t pin,
+    explicit constexpr AnalogueInput(const gpio_num_t pin,
                                             const adc_bits_width_t width) noexcept :
-        GpioAnalogueInput{pin, width, atten_default}
+        AnalogueInput{pin, width, atten_default}
     {}
 
-    explicit constexpr GpioAnalogueInput(const gpio_num_t pin,
+    explicit constexpr AnalogueInput(const gpio_num_t pin,
                                             const adc_atten_t attenuation) noexcept :
-        GpioAnalogueInput{pin, width_default, atten}
+        AnalogueInput{pin, width_default, attenuation}
     {}
 
-    constexpr GpioAnalogueInput(const std::string_view& arduino_pin_name,
+    constexpr AnalogueInput(const std::string_view& arduino_pin_name,
                                 const adc_bits_width_t width,
                                 const adc_atten_t attenuation) noexcept :
-        GpioAnalogueInput{ArduinoPinMap::at(arduino_pin_name), width, attenuation}
+        AnalogueInput{PinMap::at(arduino_pin_name), width, attenuation}
     {}
 
-    [[nodiscard]] esp_err_t init(void)
+    [[nodiscard]] esp_err_t                         init(void) noexcept
     {
         check_efuse();
 
         esp_err_t status{ESP_OK};
         
-        switch (adc_num)
+        switch (_adc_num)
         {
         case Adc_num_t::ADC_1:
             if (ESP_OK == status)
-                status |= adc1_config_width(width);
+                status |= adc1_config_width(_width);
             
             if (ESP_OK == status)
-                status |= adc1_config_channel_atten(adc1_channel, atten);
+                status |= adc1_config_channel_atten(_adc1_channel, _atten);
             break;
         case Adc_num_t::ADC_2:
             if (ESP_OK == status)
-                status |= adc2_config_channel_atten(adc2_channel, atten);
+                status |= adc2_config_channel_atten(_adc2_channel, _atten);
             break;
         default:
             status = ESP_FAIL;
@@ -563,25 +607,25 @@ public:
         };
 
         const esp_adc_cal_value_t 
-        val_type = esp_adc_cal_characterize(unit, atten, width, vref, &adc_chars); // TODO vref
+        val_type = esp_adc_cal_characterize(_unit, _atten, _width, _vref, &_adc_chars); // TODO vref
 
         (void)val_type;
 
         return status;
     }
 
-    [[nodiscard]] uint32_t get(const uint32_t n_samples = n_samples_default) const
+    [[nodiscard]] uint32_t                          get(const uint32_t n_samples = n_samples_default) const noexcept
     {
         esp_err_t   status{ESP_OK}; 
         size_t      n_fails = 0;
         int         cumulative_result = 0;
 
-        switch (adc_num)
+        switch (_adc_num)
         {
         case Adc_num_t::ADC_1:
             for (uint32_t i = 0 ; i < n_samples ; ++i)
             {
-                cumulative_result += adc1_get_raw(adc1_channel);
+                cumulative_result += adc1_get_raw(_adc1_channel);
             }
             break;
         case Adc_num_t::ADC_2:
@@ -589,7 +633,7 @@ public:
             int temp_result = 0;
             for (uint32_t i = 0 ; i < n_samples ; ++i)
             {
-                status = adc2_get_raw(adc2_channel, width, &temp_result);
+                status = adc2_get_raw(_adc2_channel, _width, &temp_result);
                 if (ESP_OK == status) cumulative_result += temp_result;
                 else ++n_fails;
             }
@@ -606,23 +650,44 @@ public:
         if (0 < n_samples_read)
         {
             int mean_result = cumulative_result / n_samples_read;
-            return esp_adc_cal_raw_to_voltage(mean_result, &adc_chars);
+            return esp_adc_cal_raw_to_voltage(mean_result, &_adc_chars);
         }
 
         return 0;
     }
 
-    [[nodiscard]] bool state(void) const 
-        { return get() > vref; }
+    [[nodiscard]] bool                              state(void) const noexcept
+        { return get() > _vref; }
+
+    [[nodiscard]] constexpr const bool&             two_point_supported(void) const noexcept    
+        { return _two_point_supported; }
+
+    [[nodiscard]] constexpr const bool&             vref_supported(void) const noexcept
+        { return _vref_supported; }
+
+    [[nodiscard]] constexpr int                     adc_num_in_idf(void) const noexcept
+        { return static_cast<std::underlying_type<Adc_num_t>::type>(_adc_num); }
+
+    [[nodiscard]] constexpr const adc_channel_t&    channel(void) const noexcept
+        { return _channel; }
+
+    [[nodiscard]] constexpr const adc_bits_width_t& width(void) const noexcept
+        { return _width; }
+
+    [[nodiscard]] constexpr const adc_atten_t&      attenuation(void) const noexcept
+        { return _atten; }
+
+    [[nodiscard]] constexpr const adc_unit_t&       unit(void) const noexcept
+        { return _unit; }
 
 private:
     static void check_efuse(void) noexcept
     {
-        if (ESP_OK == esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_TP)) two_point_supported = true;
-        else two_point_supported = false;
+        if (ESP_OK == esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_TP)) _two_point_supported = true;
+        else _two_point_supported = false;
 
-        if (ESP_OK == esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_VREF)) vref_supported = true;
-        else vref_supported = false;
+        if (ESP_OK == esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_VREF)) _vref_supported = true;
+        else _vref_supported = false;
     }
 
     static constexpr adc1_channel_t pin_to_adc1_channel(const gpio_num_t pin) noexcept
@@ -688,9 +753,9 @@ private:
             !(ADC1_CHANNEL_MAX == adc1_ch && ADC2_CHANNEL_MAX == adc2_ch))
         {
             // Not both valid channels and not bot invalid channels (effectively logical XOR)
-            if (pin == ArduinoPinMap::is_adc1(pin) && ADC1_CHANNEL_MAX != adc1_ch)
+            if (pin == PinMap::is_adc1(pin) && ADC1_CHANNEL_MAX != adc1_ch)
                 return Adc_num_t::ADC_1;
-            else if (pin == ArduinoPinMap::is_adc2(pin) && ADC2_CHANNEL_MAX != adc2_ch)
+            else if (pin == PinMap::is_adc2(pin) && ADC2_CHANNEL_MAX != adc2_ch)
                 return Adc_num_t::ADC_2;
             // NOTE If we get here something is wrong with the logic
         }
@@ -711,8 +776,98 @@ private:
     }
 };
 
-inline bool GpioAnalogueInput::two_point_supported{false}, GpioAnalogueInput::vref_supported{false};
+inline bool AnalogueInput::_two_point_supported{false}, 
+            AnalogueInput::_vref_supported{false};
 
-//class GpioAnalogueOutput : public GpioOutput;
+class DacOutput : public GpioOutput
+{
+    /*const*/ dac_channel_t _channel{DAC_CHANNEL_MAX};
+
+    uint8_t _output = 0;
+    constexpr static uint32_t vref = 3300;
+
+public:
+    constexpr static bool is_valid_pin(const gpio_num_t pin) noexcept
+        { return GpioOutput::is_valid_pin(pin) && PinMap::is_dac(pin); }
+    constexpr static bool is_valid_pin(const std::string_view& arduino_pin_name) noexcept
+        { return is_valid_pin(PinMap::at(arduino_pin_name)); }
+
+    constexpr DacOutput(const gpio_num_t pin) noexcept :
+        GpioOutput{pin, 
+                    gpio_config_t{
+                        .pin_bit_mask   = static_cast<uint64_t>(1) << pin,
+                        .mode           = GPIO_MODE_INPUT,
+                        .pull_up_en     = GPIO_PULLUP_DISABLE,
+                        .pull_down_en   = GPIO_PULLDOWN_DISABLE,
+                        .intr_type      = GPIO_INTR_DISABLE
+                    }, false},
+        _channel{pin_to_dac_channel(pin)}
+    { 
+        assert(is_valid_pin(pin));
+        assert(DAC_CHANNEL_MAX != _channel);
+    }
+
+    constexpr DacOutput(const std::string_view& arduino_pin_name) noexcept :
+        DacOutput{PinMap::at(arduino_pin_name)}
+    {}
+
+    ~DacOutput(void) noexcept
+        { (void)disable(); }
+
+    [[nodiscard]] esp_err_t init(void) noexcept
+    {
+        esp_err_t status = enable();
+        if (ESP_OK == status) 
+            status |= set(0);
+        return status;
+    }
+
+    [[nodiscard]] esp_err_t enable(void) noexcept
+        { return dac_output_enable(_channel); }
+
+    [[nodiscard]] esp_err_t disable(void) noexcept
+        { return dac_output_disable(_channel); }
+
+    [[nodiscard]] esp_err_t set(const uint8_t val) noexcept
+    { 
+        const esp_err_t status = dac_output_voltage(_channel, val);
+        if (ESP_OK == status)
+            _output = val;
+        return status;
+    }
+
+    [[nodiscard]] esp_err_t set_mv(const uint32_t mv) noexcept
+        { return set(mv_to_val(mv)); }
+
+    [[nodiscard]] constexpr const uint8_t& get(void) const noexcept
+        { return _output; }
+
+    [[nodiscard]] constexpr uint32_t get_mv(void) const noexcept
+        { return val_to_mv(_output); }
+
+private:
+    [[nodiscard]] static constexpr dac_channel_t pin_to_dac_channel(const gpio_num_t pin) noexcept
+    {
+        switch (pin)
+        {
+        case GPIO_NUM_25:
+            return DAC_CHANNEL_1;
+        case GPIO_NUM_26:
+            return DAC_CHANNEL_2;
+        default:
+            return DAC_CHANNEL_MAX;
+        };
+    }
+
+    [[nodiscard]] static constexpr uint32_t val_to_mv(const uint8_t val) noexcept
+    {
+        return (vref * static_cast<uint32_t>(val)) / static_cast<uint32_t>(UINT8_MAX);
+    }
+
+    [[nodiscard]] static constexpr uint8_t mv_to_val(const uint32_t mv) noexcept
+    {
+        return (mv * static_cast<uint32_t>(UINT8_MAX)) / vref;
+    }
+};
 
 } // namespace GPIO
