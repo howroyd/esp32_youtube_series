@@ -10,6 +10,8 @@
 #include <cstdint>
 #include <cstring>
 #include <array>
+#include <bitset>
+#include <mutex>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -258,10 +260,19 @@ public:
 
 class GpioBase
 {
+    static std::mutex _in_use_mutx;
+    static std::bitset<GPIO_NUM_MAX> _in_use;
+
 protected:
     const gpio_num_t    _pin;
     const bool          _inverted_logic = false;
     const gpio_config_t _cfg;
+
+    [[nodiscard]] esp_err_t lock_pin(void) noexcept
+        { return _lock_pin(_pin); }
+
+    esp_err_t unlock_pin(void) noexcept
+        { return _unlock_pin(_pin); }
 
 public:
     constexpr static bool is_valid_pin(const gpio_num_t pin) noexcept
@@ -295,7 +306,7 @@ public:
     {}
 
     ~GpioBase(void) noexcept
-        { gpio_reset_pin(_pin); }
+        { deinit(); }
 
     [[nodiscard]] virtual bool                        state(void) const noexcept =0;
 
@@ -303,7 +314,21 @@ public:
         { return state(); }
     
     [[nodiscard]] esp_err_t                           init(void) noexcept
-        { return gpio_config(&_cfg); }
+    {
+        const esp_err_t status = lock_pin();
+        if (ESP_OK == status)
+            return gpio_config(&_cfg);
+
+        return status;
+    }
+
+    esp_err_t                                         deinit(void) noexcept
+    {
+        gpio_reset_pin(_pin);
+        unlock_pin();
+
+        return ESP_OK;
+    }
 
     [[nodiscard]] constexpr const gpio_num_t&         pin(void) const noexcept
         { return _pin; }
@@ -325,7 +350,39 @@ public:
 
     [[nodiscard]] constexpr const gpio_int_type_t&    cfg_intr_type(void) const noexcept
         { return _cfg.intr_type; }
+
+private:
+    [[nodiscard]] static esp_err_t _lock_pin(const gpio_num_t pin) noexcept
+    {
+        const std::lock_guard<std::mutex> lock(_in_use_mutx);
+
+        if (!_in_use[pin])
+        {
+            _in_use.set(pin);
+
+            return ESP_OK;
+        }
+
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    static esp_err_t _unlock_pin(const gpio_num_t pin) noexcept
+    {
+        const std::lock_guard<std::mutex> lock(_in_use_mutx);
+
+        if (_in_use[pin])
+        {
+            _in_use.reset(pin);
+
+            return ESP_OK;
+        }
+
+        return ESP_ERR_INVALID_STATE;
+    }
 }; // GpioBase
+
+inline std::bitset<GPIO_NUM_MAX> GpioBase::_in_use;
+inline std::mutex                GpioBase::_in_use_mutx;
 
 class GpioOutput : public GpioBase
 {
@@ -464,8 +521,7 @@ public:
 
     ~GpioInterrupt(void) noexcept
     {
-        gpio_intr_disable(_pin);
-        gpio_isr_handler_remove(_pin);
+        deinit();
     }
 
     [[nodiscard]] esp_err_t init(gpio_isr_t isr_callback) noexcept
@@ -489,6 +545,13 @@ public:
         }
 
         return status;
+    }
+
+    esp_err_t deinit(void) noexcept
+    {
+        gpio_intr_disable(_pin);
+        gpio_isr_handler_remove(_pin);
+        return GpioInput::deinit();
     }
 };
 
@@ -586,30 +649,37 @@ public:
     {
         check_efuse();
 
-        esp_err_t status{ESP_OK};
+        esp_err_t status{lock_pin()}; // Unlock handled by base destructor
         
-        switch (_adc_num)
+        if (ESP_OK == status)
         {
-        case Adc_num_t::ADC_1:
-            if (ESP_OK == status)
-                status |= adc1_config_width(_width);
-            
-            if (ESP_OK == status)
-                status |= adc1_config_channel_atten(_adc1_channel, _atten);
-            break;
-        case Adc_num_t::ADC_2:
-            if (ESP_OK == status)
-                status |= adc2_config_channel_atten(_adc2_channel, _atten);
-            break;
-        default:
-            status = ESP_FAIL;
-            break;
-        };
+            switch (_adc_num)
+            {
+            case Adc_num_t::ADC_1:
+                if (ESP_OK == status)
+                    status |= adc1_config_width(_width);
+                
+                if (ESP_OK == status)
+                    status |= adc1_config_channel_atten(_adc1_channel, _atten);
+                break;
+            case Adc_num_t::ADC_2:
+                if (ESP_OK == status)
+                    status |= adc2_config_channel_atten(_adc2_channel, _atten);
+                break;
+            default:
+                status = ESP_FAIL;
+                break;
+            };
 
-        const esp_adc_cal_value_t 
-        val_type = esp_adc_cal_characterize(_unit, _atten, _width, _vref, &_adc_chars); // TODO vref
+            const esp_adc_cal_value_t 
+            val_type = esp_adc_cal_characterize(_unit, 
+                                                _atten, 
+                                                _width, 
+                                                _vref, 
+                                                &_adc_chars); // TODO vref
 
-        (void)val_type;
+            (void)val_type;
+        }
 
         return status;
     }
@@ -812,11 +882,13 @@ public:
     {}
 
     ~DacOutput(void) noexcept
-        { (void)disable(); }
+        { disable(); }
 
     [[nodiscard]] esp_err_t init(void) noexcept
     {
-        esp_err_t status = enable();
+        esp_err_t status{lock_pin()}; // Unlock handled by base destructor
+        if (ESP_OK == status)
+            status |= enable();
         if (ESP_OK == status) 
             status |= set(0);
         return status;
@@ -825,7 +897,7 @@ public:
     [[nodiscard]] esp_err_t enable(void) noexcept
         { return dac_output_enable(_channel); }
 
-    [[nodiscard]] esp_err_t disable(void) noexcept
+    esp_err_t disable(void) noexcept
         { return dac_output_disable(_channel); }
 
     [[nodiscard]] esp_err_t set(const uint8_t val) noexcept
