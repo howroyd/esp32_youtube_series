@@ -6,6 +6,8 @@
 #include "esp_adc_cal.h"
 #include "esp_intr_alloc.h"
 
+#include "esp_log.h"
+
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -629,6 +631,10 @@ public:
         AnalogueInput{pin, width_default, atten_default}
     {}
 
+    constexpr AnalogueInput(const std::string_view& arduino_pin_name) noexcept :
+        AnalogueInput{PinMap::at(arduino_pin_name), width_default, atten_default}
+    {}
+
     explicit constexpr AnalogueInput(const gpio_num_t pin,
                                             const adc_bits_width_t width) noexcept :
         AnalogueInput{pin, width, atten_default}
@@ -819,13 +825,18 @@ private:
         const adc1_channel_t adc1_ch = pin_to_adc1_channel(pin);
         const adc2_channel_t adc2_ch = pin_to_adc2_channel(pin);
 
-        if ((ADC1_CHANNEL_MAX != adc1_ch && ADC2_CHANNEL_MAX != adc2_ch) &&
-            !(ADC1_CHANNEL_MAX == adc1_ch && ADC2_CHANNEL_MAX == adc2_ch))
+        //if (ADC1_CHANNEL_MAX == adc1_ch && ADC2_CHANNEL_MAX == adc2_ch)
+        //    return Adc_num_t::ADC_MAX;
+        //if (ADC1_CHANNEL_MAX != adc1_ch && ADC2_CHANNEL_MAX != adc2_ch)
+        //    return Adc_num_t::ADC_MAX;
+
+        if (!((ADC1_CHANNEL_MAX != adc1_ch && ADC2_CHANNEL_MAX != adc2_ch) ||
+            (ADC1_CHANNEL_MAX == adc1_ch && ADC2_CHANNEL_MAX == adc2_ch)))
         {
             // Not both valid channels and not bot invalid channels (effectively logical XOR)
-            if (pin == PinMap::is_adc1(pin) && ADC1_CHANNEL_MAX != adc1_ch)
+            if (PinMap::is_adc1(pin) && ADC1_CHANNEL_MAX != adc1_ch)
                 return Adc_num_t::ADC_1;
-            else if (pin == PinMap::is_adc2(pin) && ADC2_CHANNEL_MAX != adc2_ch)
+            else if (PinMap::is_adc2(pin) && ADC2_CHANNEL_MAX != adc2_ch)
                 return Adc_num_t::ADC_2;
             // NOTE If we get here something is wrong with the logic
         }
@@ -840,9 +851,10 @@ private:
             return static_cast<adc_channel_t>(pin_to_adc1_channel(pin));
         case Adc_num_t::ADC_2:
             return static_cast<adc_channel_t>(pin_to_adc2_channel(pin));
-        case Adc_num_t::ADC_MAX:
-            return ADC_CHANNEL_MAX;
+        default:
+            break;
         };
+        return ADC_CHANNEL_MAX;
     }
 };
 

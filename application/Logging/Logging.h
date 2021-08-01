@@ -3,6 +3,7 @@
 #include "esp_err.h"
 #include "esp_log.h"
 
+#include <cstring>
 #include <chrono>
 #include <experimental/source_location>
 #include <mutex>
@@ -90,12 +91,18 @@ public:
                             const source_location& location = source_location::current())
     {
         if (default_level < level) return ESP_ERR_INVALID_STATE;
+
+        const char* file_name_trimmed = strrchr(location.file_name(), '/') + 1;
+        const char* func_name_trimmed = strchr(location.function_name(), '<');
         
         if (mutx.try_lock_for(defalt_mutex_wait))
         {
-            ESP_LOG_LEVEL(level, location.file_name(), 
-                            "[%d:%s]: %.*s", 
-                            location.line(), location.function_name(), 
+            ESP_LOG_LEVEL(level, file_name_trimmed ? file_name_trimmed : location.file_name(), 
+                            "[%d:%.*s]: %.*s", 
+                            location.line(), 
+                            func_name_trimmed ? (func_name_trimmed - location.function_name()) :
+                                                 strlen(location.function_name()),
+                            location.function_name(), 
                             msg.length(), msg.data());
             mutx.unlock();
             return ESP_OK;
@@ -116,7 +123,7 @@ public:
     ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t log(const esp_log_level_t level, 
+    static esp_err_t logv(const esp_log_level_t level, 
                             const Args&... args)
     {
         std::ostringstream stream;
@@ -292,7 +299,7 @@ public:
     esp_err_t operator() (const esp_log_level_t level, 
                             const Args&... args)
     {
-        return log(level, args...);
+        return logv(level, args...);
     }
 
     /// @brief Log an error message (red)
@@ -321,9 +328,9 @@ public:
 	/// 	- ESP_OK if message logged
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t error(const Args&... args)
+    static esp_err_t errorv(const Args&... args)
     {
-        return log(ESP_LOG_ERROR, args...);
+        return logv(ESP_LOG_ERROR, args...);
     }
 
     /// @brief Log a printf style error message (red)
@@ -374,9 +381,9 @@ public:
 	/// 	- ESP_OK if message logged
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t warning(const Args&... args)
+    static esp_err_t warningv(const Args&... args)
     {
-        return log(ESP_LOG_WARN, args...);
+        return logv(ESP_LOG_WARN, args...);
     }
 
     /// @brief Log a printf style warning message (yellow)
@@ -427,9 +434,9 @@ public:
 	/// 	- ESP_OK if message logged
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t info(const Args&... args)
+    static esp_err_t infov(const Args&... args)
     {
-        return log(ESP_LOG_INFO, args...);
+        return logv(ESP_LOG_INFO, args...);
     }
 
     /// @brief Log a printf style information message (green)
@@ -480,9 +487,9 @@ public:
 	/// 	- ESP_OK if message logged
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t debug(const Args&... args)
+    static esp_err_t debugv(const Args&... args)
     {
-        return log(ESP_LOG_DEBUG, args...);
+        return logv(ESP_LOG_DEBUG, args...);
     }
 
     /// @brief Log a printf style debug message (white)
@@ -533,9 +540,9 @@ public:
 	/// 	- ESP_OK if message logged
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t verbose(const Args&... args)
+    static esp_err_t verbosev(const Args&... args)
     {
-        return log(ESP_LOG_VERBOSE, args...);
+        return logv(ESP_LOG_VERBOSE, args...);
     }
 
     /// @brief Log a printf style verbose message

@@ -11,18 +11,20 @@
 #include "Wifi.h"
 #include "SntpTime.h"
 #include "Logging.h"
+#include <array>
 
 class Main final
 {
 public:
-    Main(void) :
-        sntp{SNTP::Sntp::get_instance()} {}
+    //Main(void) :
+    //    sntp{SNTP::Sntp::get_instance()} {}
 
     esp_err_t setup(void);
     void loop(void);
 
     Gpio::GpioOutput led{GPIO_NUM_27, true};
-    Gpio::GpioOutput arduled{"D6", true};
-    WIFI::Wifi wifi;
-    SNTP::Sntp& sntp;
+    std::array<Gpio::GpioOutput, 3> multicolour_led{Gpio::GpioOutput{"D9"}, Gpio::GpioOutput{"D11"}, Gpio::GpioOutput{"D10"}}; // RGB
+    Gpio::AnalogueInput pot{"A1"};
+    //WIFI::Wifi wifi;
+    //SNTP::Sntp& sntp;
 };

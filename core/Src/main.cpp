@@ -51,22 +51,24 @@ extern "C" void app_main(void)
     ESP_LOGI(LOG_TAG, "Initialising NVS");
     ESP_ERROR_CHECK(nvs_flash_init());
 
-    LOG.logf(ESP_LOG_INFO, "%d %s %s", 42, "hello", "world");
-    LOG.log(ESP_LOG_INFO, 42, "hello", "world");
+    //LOG.logf(ESP_LOG_INFO, "%d %s %s", 42, "hello", "world");
+    LOG.infov(42, "hello", "world");
 
-    std::thread count_up(foo, false);
-    std::thread count_down(foo, true);
+    //std::thread count_up(foo, false);
+    //std::thread count_down(foo, true);
 
-    count_up.join();
-    count_down.join();
-    ESP_LOGI(LOG_TAG, "threads joined main");
-
-
+    //count_up.join();
+    //count_down.join();
+    //ESP_LOGI(LOG_TAG, "threads joined main");
 
     ESP_ERROR_CHECK(my_main.setup());
 
+    int ctr = 0;
+
     while (true)
     {
+        LOG.infov("counter=", ctr++);
+        //ESP_LOGI("LOG", "%s", stream.str().c_str());
         my_main.loop();
     }
 }
@@ -77,27 +79,57 @@ esp_err_t Main::setup(void)
 
     ESP_LOGI(LOG_TAG, "Setup!");
 
-    status |= led.init();
-    status |= wifi.init();
+    //status |= led.init();
+    //status |= wifi.init();
 
-    if (ESP_OK == status) status |= wifi.begin();
+    //if (ESP_OK == status) status |= wifi.begin();
 
-    status |= sntp.init();
+    //status |= sntp.init();
+
+    for (auto& led : multicolour_led)
+    {
+        status |= led.init();
+    }
+
+    status |= pot.init();
 
     return status;
 }
 
 void Main::loop(void)
 {
-    ESP_LOGI(LOG_TAG, "Hello World!");
+    LOG.infov("ADC", pot.get(100));
 
-    ESP_LOGI(LOG_TAG, "LED on");
-    led.set(true);
-    vTaskDelay(pdSECOND);
+    enum : int { RED, GREEN, BLUE } colour{RED};
 
-    ESP_LOGI(LOG_TAG, "LED off");
-    led.set(false);
-    vTaskDelay(pdSECOND);
+    auto enum_to_name = [](int colour)
+    {
+        switch (colour)
+        {
+        case RED: return "RED";
+        case GREEN: return "GREEN";
+        case BLUE: return "BLUE";
+        default: return "ERROR";
+        };
+    };
 
+    auto increment_enum = [&](void)
+    {
+        switch (colour)
+        {
+        case RED: colour = GREEN; break;
+        case GREEN: colour = BLUE; break;
+        case BLUE: colour = RED; break;
+        default: colour = RED; break;
+        };
+    };
 
+    for (auto& led : multicolour_led)
+    {
+        //LOG.infov("LED", enum_to_name(colour), "ON");
+        led.set(true); vTaskDelay(pdSECOND/4);
+        //LOG.infov("LED", enum_to_name(colour), "OFF");
+        led.set(false); vTaskDelay(pdSECOND/4);
+        increment_enum();
+    }
 }
