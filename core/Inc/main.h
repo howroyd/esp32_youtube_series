@@ -11,10 +11,14 @@
 #include "Wifi.h"
 #include "SntpTime.h"
 #include "Logging.h"
+
 #include <array>
 
 class Main final
 {
+    static void task_blinky(void *pvParameters);
+    static TaskHandle_t h_task;
+
 public:
     //Main(void) :
     //    sntp{SNTP::Sntp::get_instance()} {}
@@ -22,21 +26,28 @@ public:
     esp_err_t setup(void);
     void loop(void);
 
-    std::array<Gpio::GpioOutput, 3> multicolour_led{
+protected:
+    std::array<Gpio::GpioOutput, 3> multicolour_led
+    {
         Gpio::GpioOutput{"D9"},   // Red
         Gpio::GpioOutput{"D11"},  // Green
-        Gpio::GpioOutput{"D10"}}; // Blue
+        Gpio::GpioOutput{"D10"}   // Blue
+    };
     
-    std::array<Gpio::GpioOutput, 2> led{
+    std::array<Gpio::GpioOutput, 2> led
+    {
         Gpio::GpioOutput{"D12"},  // Red
-        Gpio::GpioOutput{"D13"}}; // Blue
+        Gpio::GpioOutput{"D13"}   // Blue
+    };
 
-    std::array<Gpio::GpioInterrupt, 2> button{
+    std::array<Gpio::GpioInterrupt, 2> button
+    {
         Gpio::GpioInterrupt{"D3", GPIO_INTR_NEGEDGE},
-        Gpio::GpioInterrupt{"D2", GPIO_INTR_NEGEDGE}};
+        Gpio::GpioInterrupt{"D2", GPIO_INTR_NEGEDGE}
+    };
 
-    Gpio::GpioInput pot{"A0"};
-    Gpio::GpioInput ldr{"A1"};
+    Gpio::AnalogueInput pot{"A0"};
+    Gpio::AnalogueInput ldr{"A1"};
     //WIFI::Wifi wifi;
     //SNTP::Sntp& sntp;
 };

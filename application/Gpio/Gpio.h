@@ -44,12 +44,12 @@ class PinMap
         {"D11", GPIO_NUM_23},
         {"D12", GPIO_NUM_19},
         {"D13", GPIO_NUM_18},
-        {"A0",  GPIO_NUM_39},
-        {"A1",  GPIO_NUM_36},
-        {"A2",  GPIO_NUM_34},
-        {"A3",  GPIO_NUM_35},
-        {"A4",  GPIO_NUM_4},
-        {"A5",  GPIO_NUM_2},
+        {"A0",  GPIO_NUM_2},
+        {"A1",  GPIO_NUM_4},
+        {"A2",  GPIO_NUM_35},
+        {"A3",  GPIO_NUM_34},
+        {"A4",  GPIO_NUM_36},
+        {"A5",  GPIO_NUM_39},
         {"SDA", GPIO_NUM_21},
         {"SCL", GPIO_NUM_22},
         {"OD",  GPIO_NUM_0}
@@ -67,11 +67,11 @@ class PinMap
         GPIO_NUM_39
     }};
 
-    constexpr static std::array<gpio_num_t, 6> adc2_pins = 
+    constexpr static std::array<gpio_num_t, 8> adc2_pins = 
     {{
         //GPIO_NUM_0, // Strapping
-        //GPIO_NUM_2, // Strapping
-        //GPIO_NUM_4, // ESP-WROVER-KIT pin
+        GPIO_NUM_2, // Strapping
+        GPIO_NUM_4, // ESP-WROVER-KIT pin
         GPIO_NUM_12,
         GPIO_NUM_13,
         GPIO_NUM_14,
@@ -526,7 +526,7 @@ public:
         deinit();
     }
 
-    [[nodiscard]] esp_err_t init(gpio_isr_t isr_callback) noexcept
+    [[nodiscard]] esp_err_t init(gpio_isr_t isr_callback, void* isr_args = nullptr) noexcept
     {
         esp_err_t status = GpioInput::init();
 
@@ -543,7 +543,7 @@ public:
 
         if (ESP_OK == status)
         {
-            status |= gpio_isr_handler_add(_pin, isr_callback, this);
+            status |= gpio_isr_handler_add(_pin, isr_callback, isr_args ? isr_args : this);
         }
 
         return status;
@@ -584,6 +584,9 @@ class AnalogueInput final : public GpioInput
     esp_adc_cal_characteristics_t _adc_chars{};
 
     uint32_t _vref{1100};
+
+    const float _lpf_k{0.4};
+    mutable float _lpf_last{0};
 
 public:
     constexpr static bool is_valid_pin(const gpio_num_t pin) noexcept
@@ -730,6 +733,14 @@ public:
         }
 
         return 0;
+    }
+
+    [[nodiscard]] uint32_t                          get_filtered(const uint32_t n_samples = n_samples_default) const noexcept
+    {
+        const float new_val = static_cast<float>(get(n_samples));
+        const float filtered_val = _lpf_last + _lpf_k * (new_val - _lpf_last);
+        _lpf_last = filtered_val;
+        return filtered_val;
     }
 
     [[nodiscard]] bool                              state(void) const noexcept
