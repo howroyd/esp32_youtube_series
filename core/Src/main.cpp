@@ -1,4 +1,5 @@
 #include "main.h"
+#include <chrono>
 
 static Main my_main;
 
@@ -59,11 +60,23 @@ esp_err_t Main::setup(void)
 
 void Main::loop(void)
 {
+    using std::chrono::high_resolution_clock;
+    using std::chrono::duration_cast;
+    using std::chrono::duration;
+    using std::chrono::milliseconds;
+
     static int ctr{0};
     LOG.infov("counter=", ctr++);
 
-    LOG.infov("ADC", pot.pin(), pot.get_filtered(100));
-    LOG.infov("LDR", ldr.pin(), ldr.get_filtered(100));
+    const auto t1 = high_resolution_clock::now();
+        const uint32_t pot_val = pot.get_filtered(200);
+    const auto t2 = high_resolution_clock::now();
+    
+    const auto ms_int = duration_cast<milliseconds>(t2 - t1);
+    const duration<double, std::milli> ms_double = t2 - t1;
+
+    LOG.infov("ADC", pot.pin(), pot_val, "\t(", ms_double.count(), ")");
+    LOG.infov("LDR", ldr.pin(), ldr.get_filtered(200));
 
     for (const auto& this_button : button)
         LOG.infov("Button", (int)this_button.pin(), this_button.state() ? "ON" : "OFF");

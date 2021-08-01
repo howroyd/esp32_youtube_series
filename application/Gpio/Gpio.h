@@ -573,19 +573,19 @@ class AnalogueInput final : public GpioInput
         ADC_MAX = -1
     } const _adc_num{Adc_num_t::ADC_MAX};
 
-    /*const*/ adc_channel_t     _channel;
-    /*const*/ adc_bits_width_t  _width{width_default};
-    /*const*/ adc_atten_t       _atten{atten_default};
-    /*const*/ adc_unit_t        _unit{ADC_UNIT_1}; // ESP32 only supports unit 1
+    const adc_channel_t     _channel;
+    const adc_bits_width_t  _width{width_default};
+    const adc_atten_t       _atten{atten_default};
+    const adc_unit_t        _unit{ADC_UNIT_1}; // ESP32 only supports unit 1
 
-    /*const*/ adc1_channel_t    _adc1_channel; // TODO std::variant instead???
-    /*const*/ adc2_channel_t    _adc2_channel; // TODO std::variant instead???
+    const adc1_channel_t    _adc1_channel; // TODO std::variant instead???
+    const adc2_channel_t    _adc2_channel; // TODO std::variant instead???
 
     esp_adc_cal_characteristics_t _adc_chars{};
 
     uint32_t _vref{1100};
 
-    const float _lpf_k{0.4};
+    const   float _lpf_k{0.4};
     mutable float _lpf_last{0};
 
 public:
