@@ -22,9 +22,21 @@ public:
     esp_err_t setup(void);
     void loop(void);
 
-    Gpio::GpioOutput led{GPIO_NUM_27, true};
-    std::array<Gpio::GpioOutput, 3> multicolour_led{Gpio::GpioOutput{"D9"}, Gpio::GpioOutput{"D11"}, Gpio::GpioOutput{"D10"}}; // RGB
-    Gpio::AnalogueInput pot{"A1"};
+    std::array<Gpio::GpioOutput, 3> multicolour_led{
+        Gpio::GpioOutput{"D9"},   // Red
+        Gpio::GpioOutput{"D11"},  // Green
+        Gpio::GpioOutput{"D10"}}; // Blue
+    
+    std::array<Gpio::GpioOutput, 2> led{
+        Gpio::GpioOutput{"D12"},  // Red
+        Gpio::GpioOutput{"D13"}}; // Blue
+
+    std::array<Gpio::GpioInterrupt, 2> button{
+        Gpio::GpioInterrupt{"D3", GPIO_INTR_NEGEDGE},
+        Gpio::GpioInterrupt{"D2", GPIO_INTR_NEGEDGE}};
+
+    Gpio::GpioInput pot{"A0"};
+    Gpio::GpioInput ldr{"A1"};
     //WIFI::Wifi wifi;
     //SNTP::Sntp& sntp;
 };

@@ -1,83 +1,37 @@
 #include "main.h"
 
-#include <thread>
-
-#define LOG_LEVEL_LOCAL ESP_LOG_VERBOSE
-#include "esp_log.h"
-#define LOG_TAG "MAIN"
-
 static Main my_main;
+static std::array<Gpio::GpioOutput, 2>* p_led = {nullptr};
 
-static void foo(const bool countdown = false)
+static void button1_cb(void*)
 {
-    const char* instance_cstr = countdown ? "down" : "up";
-    constexpr static const int max_val{5};
-    constexpr static const int min_val{0};
-    int ctr{countdown ? max_val : min_val};
+    (*p_led)[0].set(!(*p_led)[0].state());
+}
 
-    char buf[100]{};
-
-    while (true)
-    {
-        {
-            std::unique_lock<std::recursive_timed_mutex> loglock;
-            if (ESP_OK == LOG.lock(loglock, std::chrono::milliseconds(250)))
-            {
-                sprintf(buf, "%s %d",
-                                instance_cstr,
-                                countdown ? ctr-- : ctr++);
-
-                LOG.info(buf);
-
-                if      (ctr >= max_val) ctr = min_val;
-                else if (ctr <= min_val) ctr = max_val;
-
-                vTaskDelay(pdMS_TO_TICKS(750));
-
-                LOG.info(std::string("Releasing the logging lock for ") + instance_cstr);
-            }
-            else LOG.warning(std::string("Failed to aquire logging lock for ") + instance_cstr);
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(500));
-    }
+static void button2_cb(void*)
+{
+    (*p_led)[1].set(!(*p_led)[1].state());
 }
 
 extern "C" void app_main(void)
 {
-    ESP_LOGI(LOG_TAG, "Creating default event loop");
+    LOG.infov("Creating default event loop");
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    ESP_LOGI(LOG_TAG, "Initialising NVS");
+    LOG.infov("Initialising NVS");
     ESP_ERROR_CHECK(nvs_flash_init());
-
-    //LOG.logf(ESP_LOG_INFO, "%d %s %s", 42, "hello", "world");
-    LOG.infov(42, "hello", "world");
-
-    //std::thread count_up(foo, false);
-    //std::thread count_down(foo, true);
-
-    //count_up.join();
-    //count_down.join();
-    //ESP_LOGI(LOG_TAG, "threads joined main");
 
     ESP_ERROR_CHECK(my_main.setup());
 
-    int ctr = 0;
-
-    while (true)
-    {
-        LOG.infov("counter=", ctr++);
-        //ESP_LOGI("LOG", "%s", stream.str().c_str());
-        my_main.loop();
-    }
+    while (true) my_main.loop();
 }
 
 esp_err_t Main::setup(void)
 {
     esp_err_t status{ESP_OK};
 
-    ESP_LOGI(LOG_TAG, "Setup!");
+    LOG.infov("Setup!");
+    p_led = &led;
 
     //status |= led.init();
     //status |= wifi.init();
@@ -86,19 +40,23 @@ esp_err_t Main::setup(void)
 
     //status |= sntp.init();
 
-    for (auto& led : multicolour_led)
-    {
-        status |= led.init();
-    }
+    for (auto& this_led : led) status |= this_led.init();
+    for (auto& this_led : multicolour_led) status |= this_led.init();
+    //for (auto& this_button : button) status |= this_button.init();
+
+    status |= button[0].init(button1_cb);
+    status |= button[1].init(button2_cb);
 
     status |= pot.init();
+    status |= ldr.init();
 
     return status;
 }
 
 void Main::loop(void)
 {
-    LOG.infov("ADC", pot.get(100));
+    static int ctr{0};
+    LOG.infov("counter=", ctr++);
 
     enum : int { RED, GREEN, BLUE } colour{RED};
 
@@ -106,10 +64,10 @@ void Main::loop(void)
     {
         switch (colour)
         {
-        case RED: return "RED";
+        case RED:   return "RED";
         case GREEN: return "GREEN";
-        case BLUE: return "BLUE";
-        default: return "ERROR";
+        case BLUE:  return "BLUE";
+        default:    return "ERROR";
         };
     };
 
@@ -117,19 +75,24 @@ void Main::loop(void)
     {
         switch (colour)
         {
-        case RED: colour = GREEN; break;
+        case RED:   colour = GREEN; break;
         case GREEN: colour = BLUE; break;
-        case BLUE: colour = RED; break;
-        default: colour = RED; break;
+        case BLUE:  colour = RED; break;
+        default:    colour = RED; break;
         };
     };
 
-    for (auto& led : multicolour_led)
+    LOG.infov("ADC", pot.get());
+    LOG.infov("LDR", ldr.get());
+
+    for (auto& this_led : multicolour_led)
     {
         //LOG.infov("LED", enum_to_name(colour), "ON");
-        led.set(true); vTaskDelay(pdSECOND/4);
+        this_led.set(true); vTaskDelay(pdSECOND/4);
         //LOG.infov("LED", enum_to_name(colour), "OFF");
-        led.set(false); vTaskDelay(pdSECOND/4);
-        increment_enum();
+        this_led.set(false); vTaskDelay(pdSECOND/4);
     }
+
+    for (const auto& this_button : button)
+        LOG.infov("Button", (int)this_button.pin(), this_button.state() ? "ON" : "OFF");
 }
