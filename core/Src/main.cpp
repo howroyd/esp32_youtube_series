@@ -1,6 +1,157 @@
 #include "main.h"
 #include <chrono>
 
+#include <functional>
+#include <list>
+#include <queue>
+#include <vector>
+#include <array>
+#include <iostream>
+class QueueTest
+{
+public:
+    enum class Priority
+    {
+        LOW,
+        MEDIUM,
+        HIGH
+    };
+
+    constexpr static std::array<Priority, 3> list_of_p{
+        Priority::HIGH,
+        Priority::MEDIUM,
+        Priority::LOW};
+
+    constexpr static const char *prio_to_str(const Priority p)
+    {
+        switch (p)
+        {
+        case Priority::HIGH:
+            return "High";
+        case Priority::MEDIUM:
+            return "Medium";
+        case Priority::LOW:
+            return "Low";
+        }
+        return "";
+    }
+
+    enum class Led
+    {
+        GREEN,
+        YELLOW,
+        RED
+    };
+
+    constexpr static std::array<Led, 3> list_of_l{
+        Led::RED,
+        Led::YELLOW,
+        Led::GREEN};
+
+    constexpr static const char *led_to_str(const Led l)
+    {
+        switch (l)
+        {
+        case Led::RED:
+            return "Red";
+        case Led::YELLOW:
+            return "Yellow";
+        case Led::GREEN:
+            return "Green";
+        }
+        return "";
+    }
+
+    enum class Buzzer
+    {
+        OFF,
+        PULSE,
+        CONSTANT
+    };
+
+    constexpr static std::array<Buzzer, 3> list_of_b{
+        Buzzer::OFF,
+        Buzzer::PULSE,
+        Buzzer::CONSTANT};
+
+    constexpr static const char *buzz_to_str(const Buzzer b)
+    {
+        switch (b)
+        {
+        case Buzzer::OFF:
+            return "Off";
+        case Buzzer::PULSE:
+            return "Pulse";
+        case Buzzer::CONSTANT:
+            return "Constant";
+        }
+        return "";
+    }
+
+    struct Alert
+    {
+        Priority priority;
+        Led led;
+        Buzzer buzzer;
+
+        constexpr Alert(const Priority priority,
+                        const Led led,
+                        const Buzzer buzzer) noexcept : priority{priority},
+                                                        led{led},
+                                                        buzzer{buzzer}
+        {
+        }
+
+        Alert(void) = delete;
+        Alert(const Alert &) noexcept = default;
+        Alert(Alert &&) noexcept = default;
+        Alert &operator=(const Alert &) noexcept = default;
+        Alert &operator=(Alert &&) noexcept = default;
+
+        constexpr bool operator<(const Alert &other) const
+        {
+            if (other.priority == priority)
+            {
+                if (other.led == led)
+                {
+                    return buzzer < other.buzzer;
+                }
+                return led < other.led;
+            }
+            return priority < other.priority;
+        }
+        constexpr bool operator>(const Alert &other) const { return *this > other; }
+        constexpr bool operator<=(const Alert &other) const { return !(*this > other); }
+        constexpr bool operator>=(const Alert &other) const { return !(*this < other); }
+
+        constexpr bool operator==(const Alert &other) const
+        {
+            return priority == other.priority &&
+                   led == other.led &&
+                   buzzer == other.buzzer;
+        }
+        constexpr bool operator!=(const Alert &other) const { return !(*this == other); }
+
+        constexpr static bool predicate(const Alert &left, const Alert &right)
+        {
+            return left > right;
+            if (left.priority == right.priority)
+            {
+                if (left.led == right.led)
+                {
+                    return left.buzzer < right.buzzer;
+                }
+                return left.led > right.led;
+            }
+            return left.priority > right.priority;
+        }
+    };
+};
+using queue_item_t = QueueTest::Alert ;
+using container_t = std::vector<queue_item_t>;
+using queue_t = std::priority_queue<queue_item_t, container_t, std::less<queue_item_t>>;
+queue_t *queue;
+
 static Main my_main;
 
 static void button1_cb(void* arg)
@@ -33,6 +184,19 @@ esp_err_t Main::setup(void)
     esp_err_t status{ESP_OK};
 
     LOG.infov("Setup!");
+
+    container_t mem{};
+    mem.reserve(24);
+    queue = new queue_t{std::less<queue_item_t>(), std::move(mem)};
+
+    for (auto b : QueueTest::list_of_b)
+    {
+        for (auto l : QueueTest::list_of_l)
+        {
+            for (auto p : QueueTest::list_of_p)
+                queue->push({p, l, b});
+        }
+    }
 
     //status |= led.init();
     //status |= wifi.init();
@@ -132,3 +296,6 @@ void Main::task_blinky(void *pvParameters)
         vTaskDelay(pdSECOND/4);
     }
 }
+
+
+
