@@ -1,12 +1,22 @@
 #pragma once
 
 #include <array>
+#include <functional>
 #include <memory>
 #include <type_traits>
 #include <typeindex>
 #include <typeinfo>
 
 #include "esp_gatt_defs.h"
+
+using TypeId = void*;
+
+template<class T>
+TypeId TypeIdNoRTTI(void)
+{
+    static T* TypeUniqueMarker = nullptr;
+    return &TypeUniqueMarker;
+}
 
 namespace GATT {
 
@@ -19,7 +29,7 @@ struct attr_desc_wrapper_t
     uint16_t max_length;
     uint16_t length;
     std::unique_ptr<uint8_t[]> value;
-    std::type_index ti = typeid(void);
+    TypeId ti = TypeIdNoRTTI<void>();
 
     esp_attr_desc_t get(void) const noexcept
     {
@@ -40,25 +50,25 @@ using gatt_table_t = std::array<attr_desc_wrapper_t, n_elements>;
 template <size_t n_elements, class... Attrs>
 gatt_table_t<n_elements> make_table(Attrs&&... attrs)
 {
-    return {(std:move(attrs), ...)};
+    return {(std::move(attrs), ...)};
 }
 
 template <class T>
-using strip_ptr_type = std::remove_pointer_t<std::std::remove_reference_t<T>>;
+using strip_ptr_type = std::remove_pointer_t<std::remove_reference_t<T>>;
 
 template <class T>
-using strip_arr_type = std::remove_pointer_t<std::remove_extent_t<std::std::remove_reference_t<T>>>;
+using strip_arr_type = std::remove_pointer_t<std::remove_extent_t<std::remove_reference_t<T>>>;
 
 template <class T, size_t n_elements = 1>
 struct attr_value_t
 {
     static constexpr size_t len         = n_elements;
-    static constexpr size_t len_type    = sizeof(strip_ptr_type<t>);
+    static constexpr size_t len_type    = sizeof(strip_ptr_type<T>);
     static constexpr size_t len_bytes   = len * len_type;
     static_assert(len_bytes);
 
     std::unique_ptr<uint8_t[]> val;
-    std::type_index ti = typeid(strip_arr_type<T>);
+    TypeId ti = TypeIdNoRTTI<strip_ptr_type<T>>();
 
     attr_value_t(const T value) :
         val{new uint8_t[len_bytes]}
@@ -87,7 +97,7 @@ gatt_table_t<sizeof...(Ts)> make_read_only_table(Ts&&... values)
     size_t idx = 0;
     auto fill_arr_one = [&ret, &uuid, &idx](const auto& arg)
     {
-        attr_value_t<std::remove_reference_t<arg>> arg_heap;
+        attr_value_t<std::remove_reference_t<decltype(arg)>> arg_heap;
 
         ret[idx++] = {  uuid,
                         ESP_GATT_PERM_READ,
