@@ -8,18 +8,23 @@
 #include "nvs_flash.h"
 
 #include "Gpio.h"
-#include "Wifi.h"
 #include "SntpTime.h"
-class Main final
-{
+#include "Wifi.h"
+#include "../../application/BLE/Gatt/gatts_table.h"
+
+class Main final {
 public:
-    Main(void) :
-        sntp{SNTP::Sntp::get_instance()} {}
+    Main(void)
+        : sntp { SNTP::Sntp::get_instance() }
+    {
+    }
 
     esp_err_t setup(void);
     void loop(void);
 
-    Gpio::GpioOutput led{GPIO_NUM_27, true};
+    Gpio::GpioOutput led { GPIO_NUM_2, true };
     WIFI::Wifi wifi;
     SNTP::Sntp& sntp;
+
+
 };
