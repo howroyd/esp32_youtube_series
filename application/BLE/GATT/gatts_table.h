@@ -4,8 +4,6 @@
 #include <functional>
 #include <memory>
 #include <type_traits>
-#include <typeindex>
-#include <typeinfo>
 
 #include "esp_gatt_defs.h"
 
@@ -24,12 +22,12 @@ namespace GATT {
 
 struct attr_desc_wrapper_t
 {
-    esp_bt_uuid_t uuid;
-    esp_gatt_perm_t perm;
-    uint16_t max_length;
-    uint16_t length;
-    std::unique_ptr<uint8_t[]> value;
-    TypeId ti = TypeIdNoRTTI<void>();
+    esp_bt_uuid_t               uuid;
+    esp_gatt_perm_t             perm;
+    uint16_t                    max_length;
+    uint16_t                    length;
+    std::unique_ptr<uint8_t[]>  value;
+    TypeId                      typeID = TypeIdNoRTTI<void>();
 
     esp_attr_desc_t get(void) const noexcept
     {
@@ -68,7 +66,7 @@ struct attr_value_t
     static_assert(len_bytes);
 
     std::unique_ptr<uint8_t[]> val;
-    TypeId ti = TypeIdNoRTTI<strip_ptr_type<T>>();
+    TypeId typeID = TypeIdNoRTTI<strip_ptr_type<T>>();
 
     attr_value_t(const T value) :
         val{new uint8_t[len_bytes]}
@@ -87,24 +85,43 @@ struct attr_value_t
     }
 };
 
+template <>
+struct attr_value_t<void>
+{
+    static constexpr size_t len         = 0;
+    static constexpr size_t len_type    = 0;
+    static constexpr size_t len_bytes   = 0;
+
+    std::unique_ptr<uint8_t[]> val;
+    TypeId typeID = TypeIdNoRTTI<void>();
+};
+
+template <class T, size_t n_elements = 1>
+struct table_row_t
+{
+    using UnderlyingType = std::remove_reference_t<T>;
+
+    esp_bt_uuid_t                   uuid;
+    esp_gatt_perm_t                 permission;
+    attr_value_t<UnderlyingType>    value;
+    uint16_t                        max_len = MAX_LEN;
+};
+
 template <typename... Ts>
-gatt_table_t<sizeof...(Ts)> make_read_only_table(Ts&&... values)
+gatt_table_t<sizeof...(Ts)> make_table_from_rows(Ts&&... values)
+// requires Ts to be table_row_t<...>
 {
     gatt_table_t<sizeof...(Ts)> ret;
 
-    esp_bt_uuid_t uuid = {ESP_UUID_LEN_16, 123}; // TODO
-
     size_t idx = 0;
-    auto fill_arr_one = [&ret, &uuid, &idx](const auto& arg)
+    auto fill_arr_one = [&ret, &idx](auto& arg)
     {
-        attr_value_t<std::remove_reference_t<decltype(arg)>> arg_heap;
-
-        ret[idx++] = {  uuid,
-                        ESP_GATT_PERM_READ,
-                        MAX_LEN,
-                        arg_heap.len_bytes,
-                        std::move(arg_heap.val),
-                        arg_heap.ti
+        ret[idx++] = {  arg.uuid,
+                        arg.permission,
+                        arg.max_len,
+                        arg.value.len_bytes,
+                        std::move(arg.value.val),
+                        arg.value.typeID
         };
     };
 
@@ -112,6 +129,5 @@ gatt_table_t<sizeof...(Ts)> make_read_only_table(Ts&&... values)
 
     return ret;
 }
-
 
 } // namespace GATT
