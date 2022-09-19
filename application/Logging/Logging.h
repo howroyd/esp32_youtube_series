@@ -86,16 +86,16 @@ public:
 	/// 	- ESP_OK if message logged
     ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
-    static esp_err_t log(const esp_log_level_t level,
+    esp_err_t log(const esp_log_level_t level,
                             const std::string_view& msg,
                             const source_location& location = source_location::current())
     {
-        if (default_level < level) return ESP_ERR_INVALID_STATE;
+        if (instance_level < level) return ESP_ERR_INVALID_STATE;
 
         const char* file_name_trimmed = strrchr(location.file_name(), '/') + 1;
         const char* func_name_trimmed = strchr(location.function_name(), '<');
         
-        if (mutx.try_lock_for(defalt_mutex_wait))
+        if (mutx.try_lock_for(instance_mutex_wait))
         {
             ESP_LOG_LEVEL(level, file_name_trimmed ? file_name_trimmed : location.file_name(), 
                             "[%d:%.*s]: %.*s", 
@@ -123,7 +123,7 @@ public:
     ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t logv(const esp_log_level_t level, 
+    esp_err_t logv(const esp_log_level_t level, 
                             const Args&... args)
     {
         std::ostringstream stream;
@@ -153,7 +153,7 @@ public:
                         source_location>,
                     bool> = true
             >
-    static esp_err_t logf(const esp_log_level_t level, const char* const format, const Args&... args)
+    esp_err_t logf(const esp_log_level_t level, const char* const format, const Args&... args)
     {
         char buf[logf_buf_len]{};
         snprintf(buf, sizeof(buf), format, args...); // FIXME this forwards the sourcelocation arg which will fail
@@ -182,7 +182,7 @@ public:
                         source_location>,
                     bool> = true
             >
-    static esp_err_t logf(const esp_log_level_t level, const char* const format, const Args&... args)
+    esp_err_t logf(const esp_log_level_t level, const char* const format, const Args&... args)
     {
         char buf[logf_buf_len]{};
         snprintf(buf, sizeof(buf), format, args...);
@@ -204,15 +204,15 @@ public:
     /// 	- ESP_ERR_INVALID_ARG if buffer is nullptr or length is zero
     ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
-    static esp_err_t hex(const esp_log_level_t level,
+    esp_err_t hex(const esp_log_level_t level,
                             const void* buf, const size_t buf_len,
                             const source_location& location = source_location::current())
     {
-        if (default_level < level) return ESP_ERR_INVALID_STATE;
+        if (instance_level < level) return ESP_ERR_INVALID_STATE;
         
         if (buf && 0 < buf_len)
         {
-            if (mutx.try_lock_for(defalt_mutex_wait))
+            if (mutx.try_lock_for(instance_mutex_wait))
             {
                 ESP_LOG_BUFFER_HEX_LEVEL(location.file_name(), 
                                             buf, buf_len, level);
@@ -239,15 +239,15 @@ public:
     /// 	- ESP_ERR_INVALID_ARG if buffer is nullptr or length is zero
     ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
-    static esp_err_t hexdump(const esp_log_level_t level,
+    esp_err_t hexdump(const esp_log_level_t level,
                                 const void* buf, const size_t buf_len,
                                 const source_location& location = source_location::current())
     {
-        if (default_level < level) return ESP_ERR_INVALID_STATE;
+        if (instance_level < level) return ESP_ERR_INVALID_STATE;
         
         if (buf && 0 < buf_len)
         {
-            if (mutx.try_lock_for(defalt_mutex_wait))
+            if (mutx.try_lock_for(instance_mutex_wait))
             {
                 ESP_LOG_BUFFER_HEXDUMP(location.file_name(), 
                                             buf, buf_len, level);
@@ -312,7 +312,7 @@ public:
 	/// @return 
 	/// 	- ESP_OK if message logged
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
-    static esp_err_t error(const std::string_view& msg,
+    esp_err_t error(const std::string_view& msg,
                             const source_location& location = source_location::current())
     {
         return log(ESP_LOG_ERROR, msg, location);
@@ -328,7 +328,7 @@ public:
 	/// 	- ESP_OK if message logged
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t errorv(const Args&... args)
+    esp_err_t errorv(const Args&... args)
     {
         return logv(ESP_LOG_ERROR, args...);
     }
@@ -348,7 +348,7 @@ public:
     ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t errorf(const char* const format, const Args&... args)
+    esp_err_t errorf(const char* const format, const Args&... args)
     {
         return logf(ESP_LOG_ERROR, format, args...);
     }
@@ -365,7 +365,7 @@ public:
 	/// 	- ESP_OK if message logged
     ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
-    static esp_err_t warning(const std::string_view& msg,
+    esp_err_t warning(const std::string_view& msg,
                                 const source_location& location = source_location::current())
     {
         return log(ESP_LOG_WARN, msg, location);
@@ -381,7 +381,7 @@ public:
 	/// 	- ESP_OK if message logged
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t warningv(const Args&... args)
+    esp_err_t warningv(const Args&... args)
     {
         return logv(ESP_LOG_WARN, args...);
     }
@@ -401,7 +401,7 @@ public:
     ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t warningf(const char* const format, const Args&... args)
+    esp_err_t warningf(const char* const format, const Args&... args)
     {
         return logf(ESP_LOG_WARN, format, args...);
     }
@@ -418,7 +418,7 @@ public:
 	/// 	- ESP_OK if message logged
     ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
-    static esp_err_t info(const std::string_view& msg,
+    esp_err_t info(const std::string_view& msg,
                             const source_location& location = source_location::current())
     {
         return log(ESP_LOG_INFO, msg, location);
@@ -434,7 +434,7 @@ public:
 	/// 	- ESP_OK if message logged
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t infov(const Args&... args)
+    esp_err_t infov(const Args&... args)
     {
         return logv(ESP_LOG_INFO, args...);
     }
@@ -454,7 +454,7 @@ public:
     ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t infof(const char* const format, const Args&... args)
+    esp_err_t infof(const char* const format, const Args&... args)
     {
         return logf(ESP_LOG_INFO, format, args...);
     }
@@ -471,7 +471,7 @@ public:
 	/// 	- ESP_OK if message logged
     ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
-    static esp_err_t debug(const std::string_view& msg,
+    esp_err_t debug(const std::string_view& msg,
                             const source_location& location = source_location::current())
     {
         return log(ESP_LOG_DEBUG, msg, location);
@@ -487,7 +487,7 @@ public:
 	/// 	- ESP_OK if message logged
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t debugv(const Args&... args)
+    esp_err_t debugv(const Args&... args)
     {
         return logv(ESP_LOG_DEBUG, args...);
     }
@@ -507,7 +507,7 @@ public:
     ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t debugf(const char* const format, const Args&... args)
+    esp_err_t debugf(const char* const format, const Args&... args)
     {
         return logf(ESP_LOG_DEBUG, format, args...);
     }
@@ -524,7 +524,7 @@ public:
 	/// 	- ESP_OK if message logged
     ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
-    static esp_err_t verbose(const std::string_view& msg,
+    esp_err_t verbose(const std::string_view& msg,
                                 const source_location& location = source_location::current())
     {
         return log(ESP_LOG_VERBOSE, msg, location);
@@ -540,7 +540,7 @@ public:
 	/// 	- ESP_OK if message logged
     ///     - ESP_ERR_TIMEOUT if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t verbosev(const Args&... args)
+    esp_err_t verbosev(const Args&... args)
     {
         return logv(ESP_LOG_VERBOSE, args...);
     }
@@ -560,7 +560,7 @@ public:
     ///     - ESP_ERR_INVALID_STATE if requested level is below our default minimum
     ///     - ESP_ERR_INVALID_STATE if timed out waiting to log the message
     template <typename... Args>
-    static esp_err_t verbosef(const char* format, const Args&... args)
+    esp_err_t verbosef(const char* format, const Args&... args)
     {
         return logf(ESP_LOG_VERBOSE, format, args...);
     }
